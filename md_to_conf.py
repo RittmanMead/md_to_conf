@@ -13,15 +13,19 @@
 #
 # TODO:
 #   Put some proper structure in, not a dirty mess of indented if statements.
-#   rest API?
+#   Convert to use REST API?
 #
 #
 import  sys,os,markdown,mimetypes,codecs
 from xmlrpclib import Server,Binary
 username=os.getenv('CONFLUENCE_USERNAME', 'UNSET')
 password=os.getenv('CONFLUENCE_PASSWORD', 'UNSET')
+orgname=os.getenv('CONFLUENCE_ORGNAME', 'UNSET')
 if (username=='UNSET' or password=='UNSET'):
 	print '\nConfluence username/password not found.\n\n\t==> Please set CONFLUENCE_USERNAME and CONFLUENCE_PASSWORD environment variables and try again.'
+	sys.exit(2)
+if orgname=='UNSET':
+	print '\nConfluence orgname not set.   (https://xxxx.atlassian.net/wiki/)\n\n\t==> Please set CONFLUENCE_ORGNAME environment variable and try again.'
 	sys.exit(2)
 if len(sys.argv)<2:
 	print '\n\t\n\tError: Filename missing. Program aborts. Specify the full path of the file to import as the first commandline argument.\n\n'
@@ -33,7 +37,7 @@ else:
 		else:
 			spacekey='~%s' % (username)
 		headers = {'Accept':'application/json'}
-		s=Server("https://rittmanmead.atlassian.net/wiki/rpc/xmlrpc")
+		s=Server("https://%s.atlassian.net/wiki/rpc/xmlrpc"%(orgname))
 		conf_token = s.confluence2.login(username,password)
 
 		try:
@@ -69,7 +73,7 @@ else:
 		try: 
 			# Create page
 			conf_page = s.confluence2.storePage(conf_token, conf_page_data)
-			print '\nConfluence page created:\n\t%s\n\thttps://rittmanmead.atlassian.net/wiki/pages/viewpage.action?pageId=%s' % (conf_page['title'],conf_page['id'])
+			print '\nConfluence page created:\n\t%s\n\thttps://%s.atlassian.net/wiki/pages/viewpage.action?pageId=%s' % (conf_page['title'],orgname,conf_page['id'])
 
 			#
 			if (conf_page_data['content'].find('<img')>0):

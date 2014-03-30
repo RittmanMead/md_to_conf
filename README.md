@@ -11,6 +11,10 @@ To use it, set your username/password as environment variables:
 
 If you use Google Apps to signin to Confluence, you can still have a username & password for your Confluence account. Just logout and follow the "Unable to access your account?" link from the signin page, which lets you set/retrieve a username and password.
 
+You also need to set the organisation name that is used in the subdomain. So if your Confluence page is https://acme.atlassian.net/wiki/, you'd set: 
+
+	export CONFLUENCE_ORGNAME='acme'
+
 ## Use
 
 Then invoke the script passing the path of the document to import as the first argument
