@@ -4,7 +4,7 @@ A very hacky script to import a named markdown document into Confluence. It hand
 
 ## Setup
 
-To use it, set your username/password as environment variables: 
+To use it, set your username/password as environment variables (eg add to your ~/.profile): 
 
 	export CONFLUENCE_USERNAME='Fred.Flinstone'
 	export CONFLUENCE_PASSWORD='abc123'
