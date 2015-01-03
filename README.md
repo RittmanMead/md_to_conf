@@ -1,29 +1,100 @@
-# md_to_conf.py
+Markdown to Confluence Converter
+===
 
-A very hacky script to import a named markdown document into Confluence. It handles inline images as well as code blocks. 
+A script to import a named markdown document into Confluence. It handles inline images as well as code blocks. Also there is support for some custom markdown tags for use with commonly used Confluence macros.
 
-## Setup
+The file will be converted into HTML or Confluence storage markup when required. Then a page will be created in the space or if it already exists, the page will be uploaded.
 
-To use it, set your username/password as environment variables (eg add to your ~/.profile): 
+# Setup
 
-	export CONFLUENCE_USERNAME='Fred.Flinstone'
-	export CONFLUENCE_PASSWORD='abc123'
+[Download Code](https://github.com/rittmanmead/md_to_conf)
 
-If you use Google Apps to signin to Confluence, you can still have a username & password for your Confluence account. Just logout and follow the "Unable to access your account?" link from the signin page, which lets you set/retrieve a username and password.
+## Python
+Python should be installed with the following required modules:
 
-You also need to set the organisation name that is used in the subdomain. So if your Confluence page is https://acme.atlassian.net/wiki/, you'd set: 
+* requests
+* json
+* markdown
+* mimetypes
+* codecs
+* webbrowser
+* urllib
+* argparse
 
-	export CONFLUENCE_ORGNAME='acme'
+Instructions on installing Python and modules can be found [here](https://rittmanmead.atlassian.net/wiki/display/TECH/Python).
 
-## Use
+## Environment Variables
 
-Then invoke the script passing the path of the document to import as the first argument
+To use it, you will need your Confluence username, password and organisation name. If you use Google Apps to sign in to Confluence, you can still have a username & password for your Confluence account. Just logout and follow the "Unable to access your account?" link from the sign in page, which lets you set a new password.
 
-	./md_to_conf.py "foo/bar/path with spaces.md"
+You will also need the organisation name that is used in the subdomain. For example the URL: `https://fawltytowers.atlassian.net/wiki/` would indicate an organsiation name of **fawltytowers**.
 
-Optionally, you can pass the spacekey in which to store the document as the as the second argument. 
+These can be specified at runtime or set as Confluence environment variables (eg add to your ~/.profile or ~/.bash_profile on Mac OS): 
 
-	./md_to_conf.py "foo/bar/path with spaces.md" INF
+```
+export CONFLUENCE_USERNAME='basil'
+export CONFLUENCE_PASSWORD='abc123'
+export CONFLUENCE_ORGNAME='fawltytowers'
+```
 
-If you don't specify the spacekey the script attempts to use your personal space, and exists if one does not exist. 
+On Windows, this can be set via system properties.
+
+# Use
+
+## Basic
+
+The minimum accepted parameters are the markdown file to upload as well as the Confluence space key you wish to upload to. For the following examples assume 'Test Space' with key: `TST`.
+
+```
+python md2conf.py readme.md TST
+```
+Mandatory Confluence parameters can also be set here if not already set as environment variables:
+
+* **-u** **--username**: Confluence User
+* **-p** **--password**: Confluence Password
+* **-o** **--orgname**:	 Confluence Organisation
+
+```
+python md2conf.py readme.md TST -u basil -p abc123 -o fawltytowers
+```
+Use **-h** to view a list of all available options.
+
+## Other Uses
+
+Use **-a** or **--ancestor** to designate the name of a page which the page should be created under.
+
+```
+python md2conf.py readme.md TST -a "Parent Page Name"
+```
+
+Use **-d** or **--delete** to delete the page instead of create it. Obviously this won't work if it doesn't already exist.
+
+Use **-n** or **--nossl** to specify a non-SSL url, i.e. **http://** instead of **https://**.
+
+# Markdown
+
+The original markdown to HTML conversion is performed by the Python **markdown** library. Additionally, the page name is taken from the first line of  the markdown file, usually assumed to be the title. In the case of this document, the page would be called: **Markdown to Confluence Converter**.
+
+Standard markdown syntax for images and code blocks will be automatically converted. The images are uploaded as attachments and the references updated in the HTML. The code blocks will be converted to the Confluence Code Block macro and also supports syntax highlighting.
+
+## Custom Markup
+ 
+The code supports some custom markdown syntax which can be used to render certain Confluence macros.
+
+### Info Macro
+
+Markdown syntax:
+
+```
+~?This is an info.?~
+
+~!This is a note.!~
+
+~%This is a warning.%~
+```
+
+Renders as:
+
+![macros](images/macros.png)
+
 
