@@ -82,12 +82,11 @@ def convertCodeBlock(html):
 			confML = confML + '<ac:parameter ac:name="language">' + lang + '</ac:parameter>'
 			content = re.search('<pre><code.*?>(.*?)<\/code><\/pre>', tag, re.DOTALL).group(1)
 			content = '<ac:plain-text-body><![CDATA[' + content + ']]></ac:plain-text-body>'
+			content = content.replace('&lt;', '<').replace('&gt;', '>')
+			content = content.replace('&quot;', '"').replace('&amp;', '&')
 			confML = confML + content + '</ac:structured-macro>'
 			
 			html = html.replace(tag, confML)
-	
-	html = html.replace('&lt;', '<').replace('&gt;', '>')
-	html = html.replace('&quot;', '"').replace('&amp;', '&')
 
 	return html
 
@@ -286,7 +285,7 @@ def parseMarkdown(mdFile):
 	html=html.replace('<p>~?','<p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>').replace('?~</p>', '</p></ac:rich-text-body></ac:structured-macro></p>')
 	html=html.replace('<p>~!','<p><ac:structured-macro ac:name="note"><ac:rich-text-body><p>').replace('!~</p>', '</p></ac:rich-text-body></ac:structured-macro></p>')
 	html=html.replace('<p>~%','<p><ac:structured-macro ac:name="warning"><ac:rich-text-body><p>').replace('%~</p>', '</p></ac:rich-text-body></ac:structured-macro></p>')
-		
+	
 	html = convertCodeBlock(html)
 	
 	return html
