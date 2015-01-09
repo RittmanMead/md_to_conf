@@ -81,9 +81,24 @@ Standard markdown syntax for images and code blocks will be automatically conver
  
 The code supports some custom markdown syntax which can be used to render certain Confluence macros.
 
-### Info Macro
+### Information, Note and Warning Macros
 
-Markdown syntax:
+Block quotes in Markdown are rendered as information macros. 
+
+	> This is an info
+
+![macros](images/infoMacro.png)
+
+	> Note: This is a note
+
+![macros](images/noteMacro.png)
+
+	> Warning: This is a warning
+	
+![macros](images/warningMacro.png)
+
+
+Alternatively, using a custom Markdown syntax also works:
 
 ```
 ~?This is an info.?~
@@ -92,9 +107,3 @@ Markdown syntax:
 
 ~%This is a warning.%~
 ```
-
-Renders as:
-
-![macros](images/macros.png)
-
-

@@ -82,13 +82,65 @@ def convertCodeBlock(html):
 			confML = confML + '<ac:parameter ac:name="language">' + lang + '</ac:parameter>'
 			content = re.search('<pre><code.*?>(.*?)<\/code><\/pre>', tag, re.DOTALL).group(1)
 			content = '<ac:plain-text-body><![CDATA[' + content + ']]></ac:plain-text-body>'
-			content = content.replace('&lt;', '<').replace('&gt;', '>')
-			content = content.replace('&quot;', '"').replace('&amp;', '&')
 			confML = confML + content + '</ac:structured-macro>'
 			
 			html = html.replace(tag, confML)
+	
+	html = html.replace('&lt;', '<').replace('&gt;', '>')
+	html = html.replace('&quot;', '"').replace('&amp;', '&')
 
 	return html
+
+# Converts html for info, note or warning macros
+def convertInfoMacros(html):
+	
+	infoTag = '<p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>'
+	noteTag = infoTag.replace('info','note')
+	warningTag = infoTag.replace('info','warning')
+	closeTag = '</p></ac:rich-text-body></ac:structured-macro></p>'
+	
+	# Custom tags converted into macros
+	html=html.replace('<p>~?', infoTag).replace('?~</p>', closeTag)
+	html=html.replace('<p>~!', noteTag).replace('!~</p>', closeTag)
+	html=html.replace('<p>~%', warningTag).replace('%~</p>', closeTag)
+		
+	# Convert block quotes into macros
+	quotes = re.findall('<blockquote>(.*?)</blockquote>', html, re.DOTALL)
+	if quotes:
+		for q in quotes:
+			note = re.search('^<.*>Note', q.strip(), re.IGNORECASE)
+			warning = re.search('^<.*>Warning', q.strip(), re.IGNORECASE)
+				
+			if note:
+				cleanTag = stripType(q, 'Note')
+				macroTag = cleanTag.replace('<p>', noteTag).replace('</p>', closeTag).strip()
+			elif warning:
+				cleanTag = stripType(q, 'Warning')
+				macroTag = cleanTag.replace('<p>', warningTag).replace('</p>', closeTag).strip()
+			else:
+				macroTag = q.replace('<p>', infoTag).replace('</p>', closeTag).strip()
+			
+			html = html.replace('<blockquote>%s</blockquote>' % q, macroTag)
+	return html
+	
+# Strips Note or Warning tags from html in various formats
+def stripType(tag, type):
+	tag = re.sub('%s:\s' % type, '', tag.strip(), re.IGNORECASE)
+	tag = re.sub('%s\s:\s' % type, '', tag.strip(), re.IGNORECASE)
+	tag = re.sub('<.*?>%s:\s<.*?>' % type, '', tag, re.IGNORECASE)
+	tag = re.sub('<.*?>%s\s:\s<.*?>' % type, '', tag, re.IGNORECASE)
+	tag = re.sub('<(em|strong)>%s:<.*?>\s' % type, '', tag, re.IGNORECASE)
+	tag = re.sub('<(em|strong)>%s\s:<.*?>\s' % type, '', tag, re.IGNORECASE)
+	tag = re.sub('<(em|strong)>%s<.*?>:\s' % type, '', tag, re.IGNORECASE)
+	tag = re.sub('<(em|strong)>%s\s<.*?>:\s' % type, '', tag, re.IGNORECASE)
+	stringStart = re.search('<.*?>', tag)
+	tag = upperChars(tag, [stringStart.end()])
+	return tag
+	
+# Make characters uppercase in string
+def upperChars(string, indices):
+	upperString = "".join(c.upper() if i in indices else c for i, c in enumerate(string))
+	return upperString
 
 # Retrieve page details by title
 def getPage(title):
@@ -273,22 +325,7 @@ def uploadAttachment(pageId, file, comment):
 	
 	r = s.post(url, files=fileToUpload)
 	r.raise_for_status()
-
-# Convert markdown to HTML
-def parseMarkdown(mdFile):
-	with codecs.open(markdownFile,'r','utf-8') as f:
-		html=markdown.markdown(f.read(), extensions = ['markdown.extensions.tables', 'markdown.extensions.fenced_code'])
 	
-	html = '\n'.join(html.split('\n')[1:])
-	
-	# Convert custom Info, Note and Warning tags
-	html=html.replace('<p>~?','<p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>').replace('?~</p>', '</p></ac:rich-text-body></ac:structured-macro></p>')
-	html=html.replace('<p>~!','<p><ac:structured-macro ac:name="note"><ac:rich-text-body><p>').replace('!~</p>', '</p></ac:rich-text-body></ac:structured-macro></p>')
-	html=html.replace('<p>~%','<p><ac:structured-macro ac:name="warning"><ac:rich-text-body><p>').replace('%~</p>', '</p></ac:rich-text-body></ac:structured-macro></p>')
-	
-	html = convertCodeBlock(html)
-	
-	return html
 
 def main():
 	print '\n\n\t\t----------------------------------'
@@ -302,7 +339,13 @@ def main():
 			title = f.readline().strip()
 	print 'Title:\t\t%s' % title
 	
-	html = parseMarkdown(markdownFile)
+	with codecs.open(markdownFile,'r','utf-8') as f:
+		html=markdown.markdown(f.read(), extensions = ['markdown.extensions.tables', 'markdown.extensions.fenced_code'])
+	
+	html = '\n'.join(html.split('\n')[1:])
+	
+	html = convertInfoMacros(html)
+	html = convertCodeBlock(html)
 
 	print '\nChecking if Atlas page exists...'
 	page = getPage(title)
