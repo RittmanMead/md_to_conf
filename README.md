@@ -7,7 +7,7 @@ The file will be converted into HTML or Confluence storage markup when required.
 
 # Setup
 
-[Download Code](https://github.com/rittmanmead/md_to_conf)
+[Download](https://github.com/rittmanmead/md_to_conf)
 
 ## Python
 Python should be installed with the following required modules:
