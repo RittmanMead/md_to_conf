@@ -54,6 +54,8 @@ else:
 		with codecs.open(markdown_file_to_import,'r','utf-8') as f:
 		    html=markdown.markdown(f.read())
 
+		with codecs.open('/tmp/markdown.out','w','utf-8') as f:
+			f.write(html)
 		"""with open(markdown_file_to_import) as f:
 		    html=markdown.markdown(f.read())
 		    title=f.name
@@ -68,6 +70,7 @@ else:
 		# Code block
 		# replace <pre><code> with code macro
 		html=html.replace('<pre><code>','<ac:structured-macro ac:name="code"><ac:parameter ac:name="theme">Midnight</ac:parameter><ac:plain-text-body><![CDATA[').replace('</code></pre>',']]></ac:plain-text-body></ac:structured-macro>')
+		html=html.replace('&lt;','<').replace('&gt;','>')
 		conf_page_data['content'] = html
 
 		try: 
