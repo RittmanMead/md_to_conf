@@ -83,6 +83,8 @@ The code supports some custom markdown syntax which can be used to render certai
 
 ### Information, Note and Warning Macros
 
+> **Warning:** Any blockquotes used will implement an information macro. This could potentially harm your formatting.
+
 Block quotes in Markdown are rendered as information macros. 
 
 	> This is an info

@@ -18,7 +18,7 @@ import	argparse, urllib, webbrowser
 # ArgumentParser to parse arguments and options
 parser = argparse.ArgumentParser()
 parser.add_argument("markdownFile", help="Full path of the markdown file to convert and upload.")
-parser.add_argument("spacekey", help="Confluence Space key for the page.")
+parser.add_argument('spacekey', help="Confluence Space key for the page. If omitted, will use user space.")
 parser.add_argument('-u', '--username', help='Confluence username if $CONFLUENCE_USERNAME not set.')
 parser.add_argument('-p', '--password', help='Confluence password if $CONFLUENCE_PASSWORD not set.')
 parser.add_argument('-o', '--orgname', help='Confluence organisation if $CONFLUENCE_ORGNAME not set. e.g. https://XXX.atlassian.net')
@@ -54,6 +54,9 @@ try:
 		print 'Error: Markdown file: %s does not exist.' % (markdownFile)
 		sys.exit(1)
 	
+	if spacekey is None:
+		spacekey='~%s' % (username)
+	
 	wikiUrl = 'https://%s.atlassian.net/wiki' % orgname
 	if nossl:
 		wikiUrl.replace('https://','http://')
@@ -83,12 +86,11 @@ def convertCodeBlock(html):
 			content = re.search('<pre><code.*?>(.*?)<\/code><\/pre>', tag, re.DOTALL).group(1)
 			content = '<ac:plain-text-body><![CDATA[' + content + ']]></ac:plain-text-body>'
 			confML = confML + content + '</ac:structured-macro>'
+			confML = confML.replace('&lt;', '<').replace('&gt;', '>')
+			confML = confML.replace('&quot;', '"').replace('&amp;', '&')
 			
 			html = html.replace(tag, confML)
 	
-	html = html.replace('&lt;', '<').replace('&gt;', '>')
-	html = html.replace('&quot;', '"').replace('&amp;', '&')
-
 	return html
 
 # Converts html for info, note or warning macros
@@ -175,7 +177,8 @@ def addImages(pageId, html):
 		absPath = os.path.join(sourceFolder, relPath)
 		basename = os.path.basename(relPath)
 		uploadAttachment(pageId, absPath, altText)
-		html = html.replace('%s'%(relPath),'/wiki/download/attachments/%s/%s'%(pageId, basename))
+		if re.search('http.*', relPath) is None:
+			html = html.replace('%s'%(relPath),'/wiki/download/attachments/%s/%s'%(pageId, basename))
 	
 	return html
 			
@@ -302,6 +305,9 @@ def getAttachment(pageId, filename):
 
 # Upload an attachment	
 def uploadAttachment(pageId, file, comment):
+	
+	if re.search('http.*', file):
+		return False
 	
 	contentType = mimetypes.guess_type(file)[0]
 	fileName = os.path.basename(file)
