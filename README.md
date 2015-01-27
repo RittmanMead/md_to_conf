@@ -31,7 +31,7 @@ You will also need the organisation name that is used in the subdomain. For exam
 
 These can be specified at runtime or set as Confluence environment variables (eg add to your ~/.profile or ~/.bash_profile on Mac OS): 
 
-```
+``` bash
 export CONFLUENCE_USERNAME='basil'
 export CONFLUENCE_PASSWORD='abc123'
 export CONFLUENCE_ORGNAME='fawltytowers'
