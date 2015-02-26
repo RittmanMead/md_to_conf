@@ -5,11 +5,11 @@ A script to import a named markdown document into Confluence. It handles inline 
 
 The file will be converted into HTML or Confluence storage markup when required. Then a page will be created in the space or if it already exists, the page will be uploaded.
 
-# Setup
+## Configuration
 
 [Download](https://github.com/rittmanmead/md_to_conf)
 
-## Python
+### Python
 Python should be installed with the following required modules:
 
 * requests
@@ -23,7 +23,7 @@ Python should be installed with the following required modules:
 
 Instructions on installing Python and modules can be found [here](https://rittmanmead.atlassian.net/wiki/display/TECH/Python).
 
-## Environment Variables
+### Environment Variables
 
 To use it, you will need your Confluence username, password and organisation name. If you use Google Apps to sign in to Confluence, you can still have a username & password for your Confluence account. Just logout and follow the "Unable to access your account?" link from the sign in page, which lets you set a new password.
 
@@ -39,9 +39,9 @@ export CONFLUENCE_ORGNAME='fawltytowers'
 
 On Windows, this can be set via system properties.
 
-# Use
+## Use
 
-## Basic
+### Basic
 
 The minimum accepted parameters are the markdown file to upload as well as the Confluence space key you wish to upload to. For the following examples assume 'Test Space' with key: `TST`.
 
@@ -59,7 +59,7 @@ python md2conf.py readme.md TST -u basil -p abc123 -o fawltytowers
 ```
 Use **-h** to view a list of all available options.
 
-## Other Uses
+### Other Uses
 
 Use **-a** or **--ancestor** to designate the name of a page which the page should be created under.
 
@@ -71,15 +71,11 @@ Use **-d** or **--delete** to delete the page instead of create it. Obviously th
 
 Use **-n** or **--nossl** to specify a non-SSL url, i.e. **http://** instead of **https://**.
 
-# Markdown
+## Markdown
 
 The original markdown to HTML conversion is performed by the Python **markdown** library. Additionally, the page name is taken from the first line of  the markdown file, usually assumed to be the title. In the case of this document, the page would be called: **Markdown to Confluence Converter**.
 
 Standard markdown syntax for images and code blocks will be automatically converted. The images are uploaded as attachments and the references updated in the HTML. The code blocks will be converted to the Confluence Code Block macro and also supports syntax highlighting.
-
-## Custom Markup
- 
-The code supports some custom markdown syntax which can be used to render certain Confluence macros.
 
 ### Information, Note and Warning Macros
 
