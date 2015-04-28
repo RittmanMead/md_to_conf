@@ -227,7 +227,9 @@ def addContents(html):
 	contentsMarkup = '<ac:structured-macro ac:name="toc">\n<ac:parameter ac:name="printable">true</ac:parameter>\n<ac:parameter ac:name="style">disc</ac:parameter>'
   	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="maxLevel">5</ac:parameter>\n<ac:parameter ac:name="indent">5px</ac:parameter>\n<ac:parameter ac:name="minLevel">1</ac:parameter>'
   	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="class">bigpink</ac:parameter>\n<ac:parameter ac:name="exclude"></ac:parameter>\n<ac:parameter ac:name="type">list</ac:parameter>'
+ 	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="indent">15px</ac:parameter>'
  	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="outline">false</ac:parameter>\n<ac:parameter ac:name="include"></ac:parameter>\n</ac:structured-macro>'
+ 	
  	
  	html = contentsMarkup + '\n' + html
  	return html
