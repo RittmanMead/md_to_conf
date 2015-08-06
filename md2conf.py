@@ -23,20 +23,26 @@ parser.add_argument('-u', '--username', help='Confluence username if $CONFLUENCE
 parser.add_argument('-p', '--password', help='Confluence password if $CONFLUENCE_PASSWORD not set.')
 parser.add_argument('-o', '--orgname', help='Confluence organisation if $CONFLUENCE_ORGNAME not set. e.g. https://XXX.atlassian.net')
 parser.add_argument('-a', '--ancestor', help='Parent page under which page will be created or moved.')
+parser.add_argument('-t', '--attachment', nargs='+', help='Attachment(s) to upload to page. Paths relative to the markdown file.')
+parser.add_argument('-c', '--contents', action='store_true', default=False, help='Use this option to generate a contents page.')
+parser.add_argument('-g', '--nogo', action='store_true', default=False, help='Use this option to skip navigation after upload.')
 parser.add_argument('-n', '--nossl', action='store_true', default=False, help='Use this option if NOT using SSL. Will use HTTP instead of HTTPS.')
 parser.add_argument('-d', '--delete', action='store_true', default=False, help='Use this option to delete the page instead of create it.')
 args = parser.parse_args()
 
 # Assign global variables
 try:
-	markdownFile=args.markdownFile
-	spacekey=args.spacekey
-	username=os.getenv('CONFLUENCE_USERNAME', args.username)
-	password=os.getenv('CONFLUENCE_PASSWORD', args.password)
-	orgname=os.getenv('CONFLUENCE_ORGNAME', args.orgname)
-	ancestor=args.ancestor
-	nossl=args.nossl
-	delete=args.delete
+	markdownFile = args.markdownFile
+	spacekey = args.spacekey
+	username = os.getenv('CONFLUENCE_USERNAME', args.username)
+	password = os.getenv('CONFLUENCE_PASSWORD', args.password)
+	orgname = os.getenv('CONFLUENCE_ORGNAME', args.orgname)
+	ancestor = args.ancestor
+	nossl = args.nossl
+	delete = args.delete
+	attachments = args.attachment
+	goToPage = not args.nogo
+	contents = args.contents
 	
 	if username is None:
 		print 'Error: Username not specified by environment variable or option.'
@@ -144,6 +150,29 @@ def upperChars(string, indices):
 	upperString = "".join(c.upper() if i in indices else c for i, c in enumerate(string))
 	return upperString
 
+# Process references
+def processRefs(html):
+	refs = re.findall('\n(\[\^(\d)\].*)|<p>(\[\^(\d)\].*)', html)
+	
+	if len(refs) > 0:
+			
+		for ref in refs:
+			if ref[0]:
+				fullRef = ref[0].replace('</p>', '').replace('<p>', '')
+				refID = ref[1]
+			else:
+				fullRef = ref[2]
+				refID = ref[3]
+		
+			fullRef = fullRef.replace('</p>', '').replace('<p>', '')
+			html = html.replace(fullRef, '')
+			href = re.search('href="(.*?)"', fullRef).group(1)
+		
+			superscript = '<a id="test" href="%s"><sup>%s</sup></a>' % (href, refID)
+			html = html.replace('[^%s]' % refID, superscript)
+	
+	return html
+
 # Retrieve page details by title
 def getPage(title):
 	print '\tRetrieving page information: %s' % title
@@ -153,7 +182,18 @@ def getPage(title):
 	s.auth = (username, password)
 	
 	r = s.get(url)
-	r.raise_for_status()
+	
+	# Check for errors
+	try:
+		r.raise_for_status()
+	except Exception as err:
+		error = re.search('^404', err.message)
+		if error:
+			print '\nError: Page not found. Check the following are correct:'
+			print '\tSpace Key : %s' % spacekey
+			print '\tOrganisation Name: %s\n' % orgname
+		sys.exit(1)
+		
 	data = r.json()
 	
 	if len(data[u'results']) >= 1:
@@ -181,7 +221,26 @@ def addImages(pageId, html):
 			html = html.replace('%s'%(relPath),'/wiki/download/attachments/%s/%s'%(pageId, basename))
 	
 	return html
-			
+
+# Add contents page
+def addContents(html):
+	contentsMarkup = '<ac:structured-macro ac:name="toc">\n<ac:parameter ac:name="printable">true</ac:parameter>\n<ac:parameter ac:name="style">disc</ac:parameter>'
+  	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="maxLevel">5</ac:parameter>\n<ac:parameter ac:name="minLevel">1</ac:parameter>'
+  	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="class">rm-contents</ac:parameter>\n<ac:parameter ac:name="exclude"></ac:parameter>\n<ac:parameter ac:name="type">list</ac:parameter>'
+ 	contentsMarkup = contentsMarkup + '<ac:parameter ac:name="outline">false</ac:parameter>\n<ac:parameter ac:name="include"></ac:parameter>\n</ac:structured-macro>'
+ 	
+ 	
+ 	html = contentsMarkup + '\n' + html
+ 	return html
+
+# Add attachments for an array of files
+def addAttachments(pageId, files):
+	sourceFolder = os.path.dirname(os.path.abspath(markdownFile))
+	
+	if files:
+		for file in files:
+			uploadAttachment(pageId, os.path.join(sourceFolder, file), '')
+	
 # Create a new page
 def createPage(title, body, ancestors):
 	print '\nCreating page...'
@@ -218,11 +277,12 @@ def createPage(title, body, ancestors):
 		print 'URL: %s' % link
 		
 		imgCheck = re.search('<img(.*?)\/>', body)
-		if imgCheck:
-			print '\tImages found, update procedure called.'
-			updatePage(pageId, title, body, version, ancestors)
+		if imgCheck or attachments:
+			print '\tAttachments found, update procedure called.'
+			updatePage(pageId, title, body, version, ancestors, attachments)
 		else:
-			webbrowser.open(link)
+			if goToPage:
+				webbrowser.open(link)
 	else:
 		print '\nCould not create page.'
 		sys.exit(1)
@@ -245,9 +305,12 @@ def deletePage(pageId):
 		print 'Page %s could not be deleted.' % pageId
 
 # Update a page
-def updatePage(pageId, title, body, version, ancestors):
+def updatePage(pageId, title, body, version, ancestors, attachments):
 	print '\nUpdating page...'
+	
+	# Add images and attachments
 	body = addImages(pageId, body)
+	addAttachments(pageId, attachments)
 	
 	url = '%s/rest/api/content/%s' % (wikiUrl, pageId)
 	
@@ -281,7 +344,8 @@ def updatePage(pageId, title, body, version, ancestors):
 		
 		print "\nPage updated successfully."
 		print 'URL: %s' % link
-		webbrowser.open(link)
+		if goToPage:
+			webbrowser.open(link)
 	else:
 		print "\nPage could not be updated."
 
@@ -342,7 +406,10 @@ def main():
 	print 'Space Key:\t%s' % spacekey
 	
 	with open(markdownFile, 'r') as f:
-			title = f.readline().strip()
+		title = f.readline().strip()
+		f.seek(0)
+		mdContent = f.read()
+		
 	print 'Title:\t\t%s' % title
 	
 	with codecs.open(markdownFile,'r','utf-8') as f:
@@ -352,6 +419,11 @@ def main():
 	
 	html = convertInfoMacros(html)
 	html = convertCodeBlock(html)
+	
+	if contents:
+		html = addContents(html)
+
+	html = processRefs(html)
 
 	print '\nChecking if Atlas page exists...'
 	page = getPage(title)
@@ -371,11 +443,11 @@ def main():
 		ancestors = []
 	
 	if page:
-		updatePage(page.id, title, html, page.version, ancestors)
+		updatePage(page.id, title, html, page.version, ancestors, attachments)
 	else:
 		createPage(title, html, ancestors)
 	
-	print '\nMarkdown converter completed successfully.'
+	print '\nMarkdown Converter completed successfully.'
 
 if __name__ == "__main__":
 	main()
