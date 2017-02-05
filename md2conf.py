@@ -209,7 +209,7 @@ def getPage(title):
 
 # Scan for images and upload as attachments if found
 def addImages(pageId, html):
-	sourceFolder = os.path.dirname(os.path.abspath(markdownFile))
+	sourceFolder = os.path.dirname(os.path.abspath(markdownFile)).decode('utf-8')
 	
 	for tag in re.findall('<img(.*?)\/>', html):
 		relPath = re.search('src="(.*?)"', tag).group(1)
@@ -235,7 +235,7 @@ def addContents(html):
 
 # Add attachments for an array of files
 def addAttachments(pageId, files):
-	sourceFolder = os.path.dirname(os.path.abspath(markdownFile))
+	sourceFolder = os.path.dirname(os.path.abspath(markdownFile)).decode('utf-8')
 	
 	if files:
 		for file in files:
