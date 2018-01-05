@@ -59,6 +59,18 @@ python md2conf.py readme.md TST -u basil -p abc123 -o fawltytowers
 ```
 Use **-h** to view a list of all available options.
 
+### Private Confluence
+
+Alternatively to Organisation param, you can set the full URL to Confluence wiki. Use:
+
+ * **-U** **--wikiurl**: Alternative URL
+
+or use environment variable:
+
+``` bash
+export CONFLUENCE_URL='https://confluence.example.net'
+```
+
 ### Other Uses
 
 Use **-a** or **--ancestor** to designate the name of a page which the page should be created under.

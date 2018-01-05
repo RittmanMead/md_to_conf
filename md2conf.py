@@ -22,6 +22,7 @@ parser.add_argument('spacekey', help="Confluence Space key for the page. If omit
 parser.add_argument('-u', '--username', help='Confluence username if $CONFLUENCE_USERNAME not set.')
 parser.add_argument('-p', '--password', help='Confluence password if $CONFLUENCE_PASSWORD not set.')
 parser.add_argument('-o', '--orgname', help='Confluence organisation if $CONFLUENCE_ORGNAME not set. e.g. https://XXX.atlassian.net')
+parser.add_argument('-U', '--wikiurl', help='Alternative to xxx.atlassian.net wiki URL, e.g. https://confluence.example.net; also use $CONFLUENCE_URL env.')
 parser.add_argument('-a', '--ancestor', help='Parent page under which page will be created or moved.')
 parser.add_argument('-t', '--attachment', nargs='+', help='Attachment(s) to upload to page. Paths relative to the markdown file.')
 parser.add_argument('-c', '--contents', action='store_true', default=False, help='Use this option to generate a contents page.')
@@ -36,6 +37,7 @@ try:
 	spacekey = args.spacekey
 	username = os.getenv('CONFLUENCE_USERNAME', args.username)
 	password = os.getenv('CONFLUENCE_PASSWORD', args.password)
+	wikiUrl = os.getenv('CONFLUENCE_URL', args.wikiurl)
 	orgname = os.getenv('CONFLUENCE_ORGNAME', args.orgname)
 	ancestor = args.ancestor
 	nossl = args.nossl
@@ -52,8 +54,8 @@ try:
 		print 'Error: Password not specified by environment variable or option.'
 		sys.exit(1)
 		
-	if orgname is None:
-		print 'Error: Org Name not specified by environment variable or option.'
+	if orgname is None and wikiUrl is None:
+		print 'Error: Org Name nor Alternative URL not specified by environment variable or option.'
 		sys.exit(1)
 	
 	if not os.path.exists(markdownFile):
@@ -63,9 +65,10 @@ try:
 	if spacekey is None:
 		spacekey='~%s' % (username)
 	
-	wikiUrl = 'https://%s.atlassian.net/wiki' % orgname
-	if nossl:
-		wikiUrl.replace('https://','http://')
+	if wikiUrl is None:
+		wikiUrl = 'https://%s.atlassian.net/wiki' % orgname
+		if nossl:
+			wikiUrl.replace('https://','http://')
 			
 except Exception, err:
 	print '\n\nException caught:\n%s ' % (err)
