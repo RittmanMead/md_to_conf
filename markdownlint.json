@@ -1,0 +1,8 @@
+{
+  "default": true,
+  "MD007": { "indent": 4 },
+  "MD033": { "allowed_elements": ["br"] },
+  "MD013": false,
+  "MD024": false,
+  "MD046": { "style": "fenced" }
+}
