@@ -96,15 +96,15 @@ try:
 
     if ORGNAME is not None:
         if ORGNAME.find('.') != -1:
-            CONFLUENCE_API_URL = 'https://%s' % ORGNAME
+            CONFLUENCE_API_URL_TMP = 'https://%s' % ORGNAME
         else:
-            CONFLUENCE_API_URL = 'https://%s.atlassian.net/wiki' % ORGNAME
+            CONFLUENCE_API_URL_TMP = 'https://%s.atlassian.net/wiki' % ORGNAME
     else:
         LOGGER.error('Error: Org Name not specified by environment variable or option.')
         sys.exit(1)
 
     if NOSSL:
-        CONFLUENCE_API_URL.replace('https://', 'http://')
+        CONFLUENCE_API_URL = CONFLUENCE_API_URL_TMP.replace('https://', 'http://')
 
 except Exception as err:
     LOGGER.error('\n\nException caught:\n%s ', err)
