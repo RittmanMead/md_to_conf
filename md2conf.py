@@ -35,7 +35,7 @@ PARSER.add_argument("markdownFile", help="Full path of the markdown file to conv
 PARSER.add_argument('spacekey',
                     help="Confluence Space key for the page. If omitted, will use user space.")
 PARSER.add_argument('-u', '--username', help='Confluence username if $CONFLUENCE_USERNAME not set.')
-PARSER.add_argument('-p', '--password', help='Confluence password if $CONFLUENCE_PASSWORD not set.')
+PARSER.add_argument('-p', '--apikey', help='Confluence API key if $CONFLUENCE_API_KEY not set.')
 PARSER.add_argument('-o', '--orgname',
                     help='Confluence organisation if $CONFLUENCE_ORGNAME not set. '
                          'e.g. https://XXX.atlassian.net/wiki'
@@ -69,7 +69,7 @@ try:
     MARKDOWN_FILE = ARGS.markdownFile
     SPACE_KEY = ARGS.spacekey
     USERNAME = os.getenv('CONFLUENCE_USERNAME', ARGS.username)
-    PASSWORD = os.getenv('CONFLUENCE_PASSWORD', ARGS.password)
+    API_KEY = os.getenv('CONFLUENCE_API_KEY', ARGS.apikey)
     ORGNAME = os.getenv('CONFLUENCE_ORGNAME', ARGS.orgname)
     ANCESTOR = ARGS.ancestor
     NOSSL = ARGS.nossl
@@ -83,8 +83,8 @@ try:
         LOGGER.error('Error: Username not specified by environment variable or option.')
         sys.exit(1)
 
-    if PASSWORD is None:
-        LOGGER.error('Error: Password not specified by environment variable or option.')
+    if API_KEY is None:
+        LOGGER.error('Error: API key not specified by environment variable or option.')
         sys.exit(1)
 
     if not os.path.exists(MARKDOWN_FILE):
@@ -296,7 +296,7 @@ def get_page(title):
         CONFLUENCE_API_URL, urllib.parse.quote_plus(title), SPACE_KEY)
 
     session = requests.Session()
-    session.auth = (USERNAME, PASSWORD)
+    session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
 
@@ -407,7 +407,7 @@ def create_page(title, body, ancestors):
     url = '%s/rest/api/content/' % CONFLUENCE_API_URL
 
     session = requests.Session()
-    session.auth = (USERNAME, PASSWORD)
+    session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     new_page = {'type': 'page', \
@@ -464,7 +464,7 @@ def delete_page(page_id):
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, PASSWORD)
+    session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     response = session.delete(url)
@@ -497,7 +497,7 @@ def update_page(page_id, title, body, version, ancestors, attachments):
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, PASSWORD)
+    session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     page_json = { \
@@ -544,7 +544,7 @@ def get_attachment(page_id, filename):
     url = '%s/rest/api/content/%s/child/attachment?filename=%s' % (CONFLUENCE_API_URL, page_id, filename)
 
     session = requests.Session()
-    session.auth = (USERNAME, PASSWORD)
+    session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
     response.raise_for_status()
@@ -590,7 +590,7 @@ def upload_attachment(page_id, file, comment):
         url = '%s/rest/api/content/%s/child/attachment/' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, PASSWORD)
+    session.auth = (USERNAME, API_KEY)
     session.headers.update({'X-Atlassian-Token': 'no-check'})
 
     LOGGER.info('\tUploading attachment %s...', filename)

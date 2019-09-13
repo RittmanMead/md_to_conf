@@ -41,9 +41,8 @@ pip3 install requirements.txt
 
 ### Environment Variables
 
-To use it, you will need your Confluence username, password and organisation name.
-If you use Google Apps to sign in to Confluence, you can still have a username & password for your Confluence account.
-Just logout and follow the "Unable to access your account?" link from the sign in page, which lets you set a new password.
+To use it, you will need your Confluence username, API key and organisation name.
+To generate an API key go to [https://id.atlassian.com/manage/api-tokens](https://id.atlassian.com/manage/api-tokens).
 
 You will also need the organization name that is used in the subdomain.
 For example the URL: `https://fawltytowers.atlassian.net/wiki/` would indicate an organization name of **fawltytowers**.
@@ -56,7 +55,7 @@ These can be specified at runtime or set as Confluence environment variables
 
 ``` bash
 export CONFLUENCE_USERNAME='basil'
-export CONFLUENCE_PASSWORD='abc123'
+export CONFLUENCE_API_KEY='abc123'
 export CONFLUENCE_ORGNAME='fawltytowers'
 ```
 
@@ -75,7 +74,7 @@ python3 md2conf.py readme.md TST
 Mandatory Confluence parameters can also be set here if not already set as environment variables:
 
 * **-u** **--username**: Confluence User
-* **-p** **--password**: Confluence Password
+* **-p** **--apikey**: Confluence API Key
 * **-o** **--orgname**: Confluence Organisation
 
 ```less
