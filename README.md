@@ -36,7 +36,7 @@ Make the virtualenv active:
 Required python dependencies can be installed using:
 
 ```less
-pip3 install requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### Environment Variables
