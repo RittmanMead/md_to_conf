@@ -36,7 +36,7 @@ Make the virtualenv active:
 Required python dependencies can be installed using:
 
 ```less
-pip3 install requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### Environment Variables
@@ -51,7 +51,7 @@ If the organization name contains a dot, it will be considered as a Fully Qualif
 For example the URL: `https://fawltytowers.mydomain.com/` would indicate an organization name of **fawltytowers.mydomain.com**.
 
 These can be specified at runtime or set as Confluence environment variables
-(eg add to your ~/.profile or ~/.bash_profile on Mac OS):
+(e.g. add to your `~/.profile` or `~/.bash_profile` on Mac OS):
 
 ``` bash
 export CONFLUENCE_USERNAME='basil'
