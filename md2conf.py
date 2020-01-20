@@ -58,7 +58,6 @@ PARSER.add_argument('-l', '--loglevel', default='INFO',
 PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
 
-
 ARGS = PARSER.parse_args()
 
 # Assign global variables
@@ -111,6 +110,7 @@ except Exception as err:
     LOGGER.error('\nFailed to process command line arguments. Exiting.')
     sys.exit(1)
 
+
 def convert_comment_block(html):
     """
     Convert markdown code bloc to Confluence hidden comment
@@ -124,6 +124,7 @@ def convert_comment_block(html):
     html = html.replace('<!--', open_tag).replace('-->', close_tag)
 
     return html
+
 
 def convert_code_block(html):
     """
@@ -198,6 +199,7 @@ def convert_info_macros(html):
 
     return html
 
+
 def convert_doctoc(html):
     """
     Convert doctoc to confluence macro
@@ -221,6 +223,7 @@ def convert_doctoc(html):
     html = re.sub('\<\!\-\- START doctoc.*END doctoc \-\-\>', toc_tag, html, flags=re.DOTALL)
 
     return html
+
 
 def strip_type(tag, tagtype):
     """
@@ -340,7 +343,7 @@ def add_images(page_id, html):
     """
     source_folder = os.path.dirname(os.path.abspath(MARKDOWN_FILE))
 
-    for tag in re.findall('<img(.*?)\/>', html):
+    for tag in re.findall('<img(.*?)/>', html):
         rel_path = re.search('src="(.*?)"', tag).group(1)
         alt_text = re.search('alt="(.*?)"', tag).group(1)
         abs_path = os.path.join(source_folder, rel_path)
@@ -364,15 +367,15 @@ def add_contents(html):
     :return: modified html string
     """
     contents_markup = '<ac:structured-macro ac:name="toc">\n<ac:parameter ac:name="printable">' \
-                     'true</ac:parameter>\n<ac:parameter ac:name="style">disc</ac:parameter>'
+                      'true</ac:parameter>\n<ac:parameter ac:name="style">disc</ac:parameter>'
     contents_markup = contents_markup + '<ac:parameter ac:name="maxLevel">5</ac:parameter>\n' \
-                                      '<ac:parameter ac:name="minLevel">1</ac:parameter>'
+                                        '<ac:parameter ac:name="minLevel">1</ac:parameter>'
     contents_markup = contents_markup + '<ac:parameter ac:name="class">rm-contents</ac:parameter>\n' \
-                                      '<ac:parameter ac:name="exclude"></ac:parameter>\n' \
-                                      '<ac:parameter ac:name="type">list</ac:parameter>'
+                                        '<ac:parameter ac:name="exclude"></ac:parameter>\n' \
+                                        '<ac:parameter ac:name="type">list</ac:parameter>'
     contents_markup = contents_markup + '<ac:parameter ac:name="outline">false</ac:parameter>\n' \
-                                      '<ac:parameter ac:name="include"></ac:parameter>\n' \
-                                      '</ac:structured-macro>'
+                                        '<ac:parameter ac:name="include"></ac:parameter>\n' \
+                                        '</ac:structured-macro>'
 
     html = contents_markup + '\n' + html
     return html
@@ -410,17 +413,17 @@ def create_page(title, body, ancestors):
     session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
-    new_page = {'type': 'page', \
-               'title': title, \
-               'space': {'key': SPACE_KEY}, \
-               'body': { \
-                   'storage': { \
-                       'value': body, \
-                       'representation': 'storage' \
-                       } \
-                   }, \
-               'ancestors': ancestors \
-               }
+    new_page = {'type': 'page',
+                'title': title,
+                'space': {'key': SPACE_KEY},
+                'body': {
+                    'storage': {
+                        'value': body,
+                        'representation': 'storage'
+                    }
+                },
+                'ancestors': ancestors
+                }
 
     LOGGER.debug("data: %s", json.dumps(new_page))
 
@@ -500,23 +503,23 @@ def update_page(page_id, title, body, version, ancestors, attachments):
     session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
-    page_json = { \
-        "id": page_id, \
-        "type": "page", \
-        "title": title, \
-        "space": {"key": SPACE_KEY}, \
-        "body": { \
-            "storage": { \
-                "value": body, \
-                "representation": "storage" \
-                } \
-            }, \
-        "version": { \
-            "number": version + 1, \
-            "minorEdit" : True \
-            }, \
-        'ancestors': ancestors \
-        }
+    page_json = {
+        "id": page_id,
+        "type": "page",
+        "title": title,
+        "space": {"key": SPACE_KEY},
+        "body": {
+            "storage": {
+                "value": body,
+                "representation": "storage"
+            }
+        },
+        "version": {
+            "number": version + 1,
+            "minorEdit": True
+        },
+        'ancestors': ancestors
+    }
 
     response = session.put(url, data=json.dumps(page_json))
     response.raise_for_status()
@@ -601,6 +604,19 @@ def upload_attachment(page_id, file, comment):
     return True
 
 
+def resolve_refs(html):
+    refs = re.findall('(href="([^"]+)")', html)
+    if refs:
+        for ref in refs:
+            if not ref[1].startswith(('http', '/')) and ref[1].endswith('.md'):
+                with open(os.path.dirname(MARKDOWN_FILE) + "/" + ref[1], 'r') as mdfile:
+                    title = mdfile.readline().lstrip('#').strip()
+                page = get_page(title)
+                if page:
+                    html = html.replace(ref[0], "href=\"" + page.link + "\"")
+    return html
+
+
 def main():
     """
     Main program
@@ -622,7 +638,7 @@ def main():
 
     with codecs.open(MARKDOWN_FILE, 'r', 'utf-8') as mdfile:
         html = markdown.markdown(mdfile.read(), extensions=['markdown.extensions.tables',
-                                                       'markdown.extensions.fenced_code'])
+                                                            'markdown.extensions.fenced_code'])
 
     html = '\n'.join(html.split('\n')[1:])
 
@@ -634,6 +650,8 @@ def main():
         html = add_contents(html)
 
     html = process_refs(html)
+
+    html = resolve_refs(html)
 
     LOGGER.debug('html: %s', html)
 
