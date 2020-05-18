@@ -111,6 +111,71 @@ except Exception as err:
     LOGGER.error('\nFailed to process command line arguments. Exiting.')
     sys.exit(1)
 
+def convert_local_links(title, html, processor):
+    """
+    Convert local links to correct confluence local links
+
+    :param title: string
+    :param html: string
+    :param processor: string
+    :return: modified html string
+    """
+
+    ref_prefixes = {
+      "bitbucket": "#markdown-header-",
+      "": "#"
+    }
+    ref_postfixes = {
+      "bitbucket": "_%d",
+      "": ""
+    }
+
+    hes = re.findall(r'<h\d+>(.*?)</h\d+>', html, re.DOTALL)
+    if hes:
+        ref_prefix  = ref_prefixes[processor]
+        ref_postfix = ref_postfixes[processor]
+
+        if not ref_prefix:
+            ref_prefix  = ref_prefixes[""]
+        if not ref_postfix:
+            ref_postfix = ref_postfixes[""]
+
+        result_ref_prefix  = split_join(title)
+        result_ref_postfix = ".%s"
+
+        h_map   = {}
+        h_count = {}
+
+        for h in hes:
+            key   = ref_prefix + slug(h)
+            value = result_ref_prefix + "-" + split_join(h)
+
+            if key in h_map:
+                alt_count = h_count[key]
+                alt_key   = key   + (ref_postfix % alt_count)
+                alt_value = value + (result_ref_postfix % alt_count)
+
+                h_map[alt_key] = alt_value
+                h_count[key]   = alt_count + 1
+            else:
+                h_map[key]   = value
+                h_count[key] = 1
+
+        links = re.findall(r'<a href="#.+?">.+?</a>', html)
+        if links:
+            for link in links:
+                matches = re.search(r'<a href="(#.+?)">(.+?)</a>', link)
+                ref = matches.group(1)
+                alt = matches.group(2)
+
+                result_ref = h_map[ref]
+                if result_ref:
+                    replacement = '<a href="#%s">%s</a>' % (result_ref, alt)
+                    html = html.replace(link, replacement)
+
+    return html
+
+
 def convert_comment_block(html):
     """
     Convert markdown code bloc to Confluence hidden comment
@@ -124,6 +189,7 @@ def convert_comment_block(html):
     html = html.replace('<!--', open_tag).replace('-->', close_tag)
 
     return html
+
 
 def convert_code_block(html):
     """
@@ -198,6 +264,7 @@ def convert_info_macros(html):
 
     return html
 
+
 def convert_doctoc(html):
     """
     Convert doctoc to confluence macro
@@ -221,6 +288,7 @@ def convert_doctoc(html):
     html = re.sub('\<\!\-\- START doctoc.*END doctoc \-\-\>', toc_tag, html, flags=re.DOTALL)
 
     return html
+
 
 def strip_type(tag, tagtype):
     """
@@ -253,6 +321,30 @@ def upper_chars(string, indices):
     """
     upper_string = "".join(c.upper() if i in indices else c for i, c in enumerate(string))
     return upper_string
+
+
+def split_join(string):
+    """
+    Split and join input string
+
+    :param string: string to modify
+    :return: updated string
+    """
+
+    new_string = "".join(string.split())
+    return new_string
+
+
+def slug(string):
+    """
+    Creates a slug string
+
+    :param string: string to modify
+    :return: slug string
+    """
+
+    slug_string = "-".join(string.lower().split())
+    return slug_string
 
 
 def process_refs(html):
@@ -626,6 +718,7 @@ def main():
 
     html = '\n'.join(html.split('\n')[1:])
 
+    html = convert_local_links(title, html, "bitbucket")
     html = convert_info_macros(html)
     html = convert_comment_block(html)
     html = convert_code_block(html)
