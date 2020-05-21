@@ -1,10 +1,13 @@
 # Markdown to Confluence Converter
 
 A script to import a named markdown document into Confluence.
+
 It handles inline images as well as code blocks.
+
 Also there is support for some custom markdown tags for use with commonly used Confluence macros.
 
 The file will be converted into HTML or Confluence storage markup when required.
+
 Then a page will be created in the space or if it already exists, the page will be uploaded.
 
 ## Configuration
@@ -24,6 +27,10 @@ Create a new python virtualenv:
 ```less
 > python3 -m venv venv
 ```
+
+Or in **Anaconda**
+
+	conda create --name md_to_conf python=3.7 --yes
 
 Make the virtualenv active:
 
