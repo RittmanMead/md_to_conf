@@ -57,6 +57,11 @@ PARSER.add_argument('-l', '--loglevel', default='INFO',
                     help='Use this option to set the log verbosity.')
 PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
+PARSER.add_argument('-v', '--version', type=int, action='store', default=1,
+                    help='Version of confluence page (default is 1).')
+PARSER.add_argument('-mds', '--markdownsrc', action='store', default='',
+                    help='Use this option to specify a markdown source (i.e. what processor this markdown was targeting). '
+                         'Possible values: bitbucket.')
 
 
 ARGS = PARSER.parse_args()
@@ -75,6 +80,8 @@ try:
     NOSSL = ARGS.nossl
     DELETE = ARGS.delete
     SIMULATE = ARGS.simulate
+    VERSION = ARGS.version
+    MARKDOWN_SOURCE = ARGS.markdownsrc
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
@@ -110,71 +117,6 @@ except Exception as err:
     LOGGER.error('\n\nException caught:\n%s ', err)
     LOGGER.error('\nFailed to process command line arguments. Exiting.')
     sys.exit(1)
-
-def convert_local_links(title, html, processor):
-    """
-    Convert local links to correct confluence local links
-
-    :param title: string
-    :param html: string
-    :param processor: string
-    :return: modified html string
-    """
-
-    ref_prefixes = {
-      "bitbucket": "#markdown-header-",
-      "": "#"
-    }
-    ref_postfixes = {
-      "bitbucket": "_%d",
-      "": ""
-    }
-
-    hes = re.findall(r'<h\d+>(.*?)</h\d+>', html, re.DOTALL)
-    if hes:
-        ref_prefix  = ref_prefixes[processor]
-        ref_postfix = ref_postfixes[processor]
-
-        if not ref_prefix:
-            ref_prefix  = ref_prefixes[""]
-        if not ref_postfix:
-            ref_postfix = ref_postfixes[""]
-
-        result_ref_prefix  = split_join(title)
-        result_ref_postfix = ".%s"
-
-        h_map   = {}
-        h_count = {}
-
-        for h in hes:
-            key   = ref_prefix + slug(h)
-            value = result_ref_prefix + "-" + split_join(h)
-
-            if key in h_map:
-                alt_count = h_count[key]
-                alt_key   = key   + (ref_postfix % alt_count)
-                alt_value = value + (result_ref_postfix % alt_count)
-
-                h_map[alt_key] = alt_value
-                h_count[key]   = alt_count + 1
-            else:
-                h_map[key]   = value
-                h_count[key] = 1
-
-        links = re.findall(r'<a href="#.+?">.+?</a>', html)
-        if links:
-            for link in links:
-                matches = re.search(r'<a href="(#.+?)">(.+?)</a>', link)
-                ref = matches.group(1)
-                alt = matches.group(2)
-
-                result_ref = h_map[ref]
-                if result_ref:
-                    replacement = '<a href="#%s">%s</a>' % (result_ref, alt)
-                    html = html.replace(link, replacement)
-
-    return html
-
 
 def convert_comment_block(html):
     """
@@ -323,27 +265,20 @@ def upper_chars(string, indices):
     return upper_string
 
 
-def split_join(string):
-    """
-    Split and join input string
-
-    :param string: string to modify
-    :return: updated string
-    """
-
-    new_string = "".join(string.split())
-    return new_string
-
-
-def slug(string):
+def slug(string, lowercase):
     """
     Creates a slug string
 
     :param string: string to modify
+    :param lowercase: bool indicating whether string has to be lowercased
     :return: slug string
     """
 
-    slug_string = "-".join(string.lower().split())
+    slug_string = string
+    if lowercase:
+        slug_string = string.lower()
+
+    slug_string = "-".join(slug_string.split())
     return slug_string
 
 
@@ -485,6 +420,82 @@ def add_attachments(page_id, files):
             upload_attachment(page_id, os.path.join(source_folder, file), '')
 
 
+def add_local_refs(page_id, title, html):
+    """
+    Convert local links to correct confluence local links
+
+    :param page_title: string
+    :param page_id: integer
+    :param html: string
+    :return: modified html string
+    """
+
+    ref_prefixes = {
+      "bitbucket": "#markdown-header-"
+    }
+    ref_postfixes = {
+      "bitbucket": "_%d"
+    }
+
+    # We ignore local references in case of unknown or unspecified markdown source
+    if not MARKDOWN_SOURCE in ref_prefixes or \
+       not MARKDOWN_SOURCE in ref_postfixes:
+        LOGGER.warning('Local references weren''t processed because '
+                       '--markdownsrc wasn''t set or specified source isn''t supported')
+        return html
+
+    ref_prefix = ref_prefixes[MARKDOWN_SOURCE]
+    ref_postfix = ref_postfixes[MARKDOWN_SOURCE]
+
+    LOGGER.info('Converting confluence local links...')
+
+    headers = re.findall(r'<h\d+>(.*?)</h\d+>', html, re.DOTALL)
+    if headers:
+        headers_map = {}
+        headers_count = {}
+
+        for header in headers:
+            key = ref_prefix + slug(header, True)
+
+            if VERSION == 1:
+                value = ''.join(header.split())
+            if VERSION == 2:
+                value = slug(header, False)
+
+            if key in headers_map:
+                alt_count = headers_count[key]
+
+                alt_key = key + (ref_postfix % alt_count)
+                alt_value = value + ('.%s' % alt_count)
+
+                headers_map[alt_key] = alt_value
+                headers_count[key] = alt_count + 1
+            else:
+                headers_map[key] = value
+                headers_count[key] = 1
+
+        links = re.findall(r'<a href="#.+?">.+?</a>', html)
+        if links:
+            for link in links:
+                matches = re.search(r'<a href="(#.+?)">(.+?)</a>', link)
+                ref = matches.group(1)
+                alt = matches.group(2)
+
+                result_ref = headers_map[ref]
+
+                if result_ref:
+                    base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
+                    if VERSION == 1:
+                        replacement_uri = '%s#%s-%s' % (base_uri, ''.join(title.split()), result_ref)
+                    if VERSION == 2:
+                        replacement_uri = '%s#%s' % (base_uri, result_ref)
+
+                    replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
+                    html = html.replace(link, replacement)
+
+    return html
+
+
 def create_page(title, body, ancestors):
     """
     Create a new page
@@ -511,7 +522,14 @@ def create_page(title, body, ancestors):
                        'representation': 'storage' \
                        } \
                    }, \
-               'ancestors': ancestors \
+               'ancestors': ancestors, \
+               'metadata': { \
+                   'properties': { \
+            	  	     'editor': { \
+            	  		       'value': 'v%d' % VERSION \
+            	  	         } \
+              	       } \
+                   } \
                }
 
     LOGGER.debug("data: %s", json.dumps(new_page))
@@ -534,8 +552,9 @@ def create_page(title, body, ancestors):
         LOGGER.info('URL: %s', link)
 
         img_check = re.search('<img(.*?)\/>', body)
-        if img_check or ATTACHMENTS:
-            LOGGER.info('\tAttachments found, update procedure called.')
+        local_ref_check = re.search('<a href="(#.+?)">(.+?)</a>', body)
+        if img_check or local_ref_check or ATTACHMENTS:
+            LOGGER.info('\tAttachments or local references found, update procedure called.')
             update_page(page_id, title, body, version, ancestors, ATTACHMENTS)
         else:
             if GO_TO_PAGE:
@@ -585,6 +604,9 @@ def update_page(page_id, title, body, version, ancestors, attachments):
     # Add images and attachments
     body = add_images(page_id, body)
     add_attachments(page_id, attachments)
+
+    # Add local references
+    body = add_local_refs(page_id, title, body)
 
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
@@ -718,7 +740,6 @@ def main():
 
     html = '\n'.join(html.split('\n')[1:])
 
-    html = convert_local_links(title, html, "bitbucket")
     html = convert_info_macros(html)
     html = convert_comment_block(html)
     html = convert_code_block(html)
