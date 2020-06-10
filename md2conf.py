@@ -64,6 +64,9 @@ PARSER.add_argument('-mds', '--markdownsrc', action='store', default='',
                          'Possible values: bitbucket.')
 PARSER.add_argument('--label', action='append', dest='labels', default=[],
                     help='A list of labels to set on the page.')
+PARSER.add_argument('--property', action='append', dest='properties', default=[],
+                    type=lambda kv: kv.split("="),
+                    help='A list of content properties to set on the page.')
 
 ARGS = PARSER.parse_args()
 
@@ -84,6 +87,7 @@ try:
     VERSION = ARGS.version
     MARKDOWN_SOURCE = ARGS.markdownsrc
     LABELS = ARGS.labels
+    PROPERTIES = dict(ARGS.properties)
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
@@ -324,6 +328,11 @@ def get_page(title):
     url = '%s/rest/api/content?title=%s&spaceKey=%s&expand=version,ancestors' % (
         CONFLUENCE_API_URL, urllib.parse.quote_plus(title), SPACE_KEY)
 
+    # We retrieve content property values as part of page content
+    # to make sure we are able to update them later
+    if PROPERTIES:
+        url = '%s,%s' % (url, ','.join("metadata.properties.%s" % v for v in PROPERTIES.keys()))
+
     session = requests.Session()
     session.auth = (USERNAME, API_KEY)
 
@@ -351,8 +360,17 @@ def get_page(title):
         version_num = data[u'results'][0][u'version'][u'number']
         link = '%s%s' % (CONFLUENCE_API_URL, data[u'results'][0][u'_links'][u'webui'])
 
-        page_info = collections.namedtuple('PageInfo', ['id', 'version', 'link'])
-        page = page_info(page_id, version_num, link)
+        try:
+            LOGGER.info(str(data))
+            properties = data[u'results'][0][u'metadata'][u'properties']
+
+        except KeyError:
+            # In case when page has no content properties we can simply ignore them
+            properties = {}
+            pass
+
+        page_info = collections.namedtuple('PageInfo', ['id', 'version', 'link', 'properties'])
+        page = page_info(page_id, version_num, link, properties)
         return page
 
     return False
@@ -553,11 +571,17 @@ def create_page(title, body, ancestors):
         LOGGER.info('Page created in %s with ID: %s.', space_name, page_id)
         LOGGER.info('URL: %s', link)
 
+        # Populate properties dictionary with initial property values
+        properties = {}
+        if PROPERTIES:
+            for key in PROPERTIES:
+                properties[key] = {"key": key, "version": 1, "value": PROPERTIES[key]}
+
         img_check = re.search('<img(.*?)\/>', body)
         local_ref_check = re.search('<a href="(#.+?)">(.+?)</a>', body)
-        if img_check or local_ref_check or ATTACHMENTS or LABELS:
-            LOGGER.info('\tAttachments, local references or labels found, update procedure called.')
-            update_page(page_id, title, body, version, ancestors, ATTACHMENTS)
+        if img_check or local_ref_check or properties or ATTACHMENTS or LABELS:
+            LOGGER.info('\tAttachments, local references, content properties or labels found, update procedure called.')
+            update_page(page_id, title, body, version, ancestors, properties, ATTACHMENTS)
         else:
             if GO_TO_PAGE:
                 webbrowser.open(link)
@@ -589,7 +613,7 @@ def delete_page(page_id):
         LOGGER.error('Page %s could not be deleted.', page_id)
 
 
-def update_page(page_id, title, body, version, ancestors, attachments):
+def update_page(page_id, title, body, version, ancestors, properties, attachments):
     """
     Update a page
 
@@ -653,6 +677,20 @@ def update_page(page_id, title, body, version, ancestors, attachments):
 
         LOGGER.info("Page updated successfully.")
         LOGGER.info('URL: %s', link)
+
+        if properties:
+            LOGGER.info("Updating page content properties...")
+
+            for key in properties:
+                prop_url = '%s/property/%s' % (url, key)
+                prop_json = {"key": key, "version": {"number": properties[key][u"version"]}, "value": properties[key][u"value"]}
+
+                response = session.put(prop_url, data=json.dumps(prop_json))
+                response.raise_for_status()
+
+                if response.status_code == 200:
+                    LOGGER.info("\tUpdated property %s", key)
+
         if GO_TO_PAGE:
             webbrowser.open(link)
     else:
@@ -785,7 +823,16 @@ def main():
         ancestors = []
 
     if page:
-        update_page(page.id, title, html, page.version, ancestors, ATTACHMENTS)
+        # Populate properties dictionary with updated property values
+        properties = {}
+        if PROPERTIES:
+            for key in PROPERTIES:
+                if key in page.properties:
+                    properties[key] = {"key": key, "version": page.properties[key][u'version'][u'number'] + 1, "value": PROPERTIES[key]}
+                else:
+                    properties[key] = {"key": key, "version": 1, "value": PROPERTIES[key]}
+
+        update_page(page.id, title, html, page.version, ancestors, properties, ATTACHMENTS)
     else:
         create_page(title, html, ancestors)
 
