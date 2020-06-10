@@ -62,7 +62,8 @@ PARSER.add_argument('-v', '--version', type=int, action='store', default=1,
 PARSER.add_argument('-mds', '--markdownsrc', action='store', default='',
                     help='Use this option to specify a markdown source (i.e. what processor this markdown was targeting). '
                          'Possible values: bitbucket.')
-
+PARSER.add_argument('--label', action='append', dest='labels', default=[],
+                    help='A list of labels to set on the page.')
 
 ARGS = PARSER.parse_args()
 
@@ -82,6 +83,7 @@ try:
     SIMULATE = ARGS.simulate
     VERSION = ARGS.version
     MARKDOWN_SOURCE = ARGS.markdownsrc
+    LABELS = ARGS.labels
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
@@ -553,8 +555,8 @@ def create_page(title, body, ancestors):
 
         img_check = re.search('<img(.*?)\/>', body)
         local_ref_check = re.search('<a href="(#.+?)">(.+?)</a>', body)
-        if img_check or local_ref_check or ATTACHMENTS:
-            LOGGER.info('\tAttachments or local references found, update procedure called.')
+        if img_check or local_ref_check or ATTACHMENTS or LABELS:
+            LOGGER.info('\tAttachments, local references or labels found, update procedure called.')
             update_page(page_id, title, body, version, ancestors, ATTACHMENTS)
         else:
             if GO_TO_PAGE:
@@ -631,6 +633,16 @@ def update_page(page_id, title, body, version, ancestors, attachments):
             }, \
         'ancestors': ancestors \
         }
+
+    if LABELS:
+        if 'metadata' not in page_json:
+            page_json['metadata'] = {}
+
+        labels = []
+        for value in LABELS:
+            labels.append({"name": value})
+
+        page_json['metadata']['labels'] = labels
 
     response = session.put(url, data=json.dumps(page_json))
     response.raise_for_status()
