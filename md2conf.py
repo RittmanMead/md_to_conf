@@ -57,7 +57,13 @@ PARSER.add_argument('-l', '--loglevel', default='INFO',
                     help='Use this option to set the log verbosity.')
 PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
-
+PARSER.add_argument('-v', '--version', type=int, action='store', default=1,
+                    help='Version of confluence page (default is 1).')
+PARSER.add_argument('-mds', '--markdownsrc', action='store', default='',
+                    help='Use this option to specify a markdown source (i.e. what processor this markdown was targeting). '
+                         'Possible values: bitbucket.')
+PARSER.add_argument('--label', action='append', dest='labels', default=[],
+                    help='A list of labels to set on the page.')
 
 ARGS = PARSER.parse_args()
 
@@ -75,6 +81,9 @@ try:
     NOSSL = ARGS.nossl
     DELETE = ARGS.delete
     SIMULATE = ARGS.simulate
+    VERSION = ARGS.version
+    MARKDOWN_SOURCE = ARGS.markdownsrc
+    LABELS = ARGS.labels
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
@@ -124,6 +133,7 @@ def convert_comment_block(html):
     html = html.replace('<!--', open_tag).replace('-->', close_tag)
 
     return html
+
 
 def convert_code_block(html):
     """
@@ -198,6 +208,7 @@ def convert_info_macros(html):
 
     return html
 
+
 def convert_doctoc(html):
     """
     Convert doctoc to confluence macro
@@ -221,6 +232,7 @@ def convert_doctoc(html):
     html = re.sub('\<\!\-\- START doctoc.*END doctoc \-\-\>', toc_tag, html, flags=re.DOTALL)
 
     return html
+
 
 def strip_type(tag, tagtype):
     """
@@ -253,6 +265,23 @@ def upper_chars(string, indices):
     """
     upper_string = "".join(c.upper() if i in indices else c for i, c in enumerate(string))
     return upper_string
+
+
+def slug(string, lowercase):
+    """
+    Creates a slug string
+
+    :param string: string to modify
+    :param lowercase: bool indicating whether string has to be lowercased
+    :return: slug string
+    """
+
+    slug_string = string
+    if lowercase:
+        slug_string = string.lower()
+
+    slug_string = "-".join(slug_string.split())
+    return slug_string
 
 
 def process_refs(html):
@@ -393,6 +422,82 @@ def add_attachments(page_id, files):
             upload_attachment(page_id, os.path.join(source_folder, file), '')
 
 
+def add_local_refs(page_id, title, html):
+    """
+    Convert local links to correct confluence local links
+
+    :param page_title: string
+    :param page_id: integer
+    :param html: string
+    :return: modified html string
+    """
+
+    ref_prefixes = {
+      "bitbucket": "#markdown-header-"
+    }
+    ref_postfixes = {
+      "bitbucket": "_%d"
+    }
+
+    # We ignore local references in case of unknown or unspecified markdown source
+    if not MARKDOWN_SOURCE in ref_prefixes or \
+       not MARKDOWN_SOURCE in ref_postfixes:
+        LOGGER.warning('Local references weren''t processed because '
+                       '--markdownsrc wasn''t set or specified source isn''t supported')
+        return html
+
+    ref_prefix = ref_prefixes[MARKDOWN_SOURCE]
+    ref_postfix = ref_postfixes[MARKDOWN_SOURCE]
+
+    LOGGER.info('Converting confluence local links...')
+
+    headers = re.findall(r'<h\d+>(.*?)</h\d+>', html, re.DOTALL)
+    if headers:
+        headers_map = {}
+        headers_count = {}
+
+        for header in headers:
+            key = ref_prefix + slug(header, True)
+
+            if VERSION == 1:
+                value = ''.join(header.split())
+            if VERSION == 2:
+                value = slug(header, False)
+
+            if key in headers_map:
+                alt_count = headers_count[key]
+
+                alt_key = key + (ref_postfix % alt_count)
+                alt_value = value + ('.%s' % alt_count)
+
+                headers_map[alt_key] = alt_value
+                headers_count[key] = alt_count + 1
+            else:
+                headers_map[key] = value
+                headers_count[key] = 1
+
+        links = re.findall(r'<a href="#.+?">.+?</a>', html)
+        if links:
+            for link in links:
+                matches = re.search(r'<a href="(#.+?)">(.+?)</a>', link)
+                ref = matches.group(1)
+                alt = matches.group(2)
+
+                result_ref = headers_map[ref]
+
+                if result_ref:
+                    base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
+                    if VERSION == 1:
+                        replacement_uri = '%s#%s-%s' % (base_uri, ''.join(title.split()), result_ref)
+                    if VERSION == 2:
+                        replacement_uri = '%s#%s' % (base_uri, result_ref)
+
+                    replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
+                    html = html.replace(link, replacement)
+
+    return html
+
+
 def create_page(title, body, ancestors):
     """
     Create a new page
@@ -419,7 +524,14 @@ def create_page(title, body, ancestors):
                        'representation': 'storage' \
                        } \
                    }, \
-               'ancestors': ancestors \
+               'ancestors': ancestors, \
+               'metadata': { \
+                   'properties': { \
+            	  	     'editor': { \
+            	  		       'value': 'v%d' % VERSION \
+            	  	         } \
+              	       } \
+                   } \
                }
 
     LOGGER.debug("data: %s", json.dumps(new_page))
@@ -442,8 +554,9 @@ def create_page(title, body, ancestors):
         LOGGER.info('URL: %s', link)
 
         img_check = re.search('<img(.*?)\/>', body)
-        if img_check or ATTACHMENTS:
-            LOGGER.info('\tAttachments found, update procedure called.')
+        local_ref_check = re.search('<a href="(#.+?)">(.+?)</a>', body)
+        if img_check or local_ref_check or ATTACHMENTS or LABELS:
+            LOGGER.info('\tAttachments, local references or labels found, update procedure called.')
             update_page(page_id, title, body, version, ancestors, ATTACHMENTS)
         else:
             if GO_TO_PAGE:
@@ -494,6 +607,9 @@ def update_page(page_id, title, body, version, ancestors, attachments):
     body = add_images(page_id, body)
     add_attachments(page_id, attachments)
 
+    # Add local references
+    body = add_local_refs(page_id, title, body)
+
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
@@ -517,6 +633,16 @@ def update_page(page_id, title, body, version, ancestors, attachments):
             }, \
         'ancestors': ancestors \
         }
+
+    if LABELS:
+        if 'metadata' not in page_json:
+            page_json['metadata'] = {}
+
+        labels = []
+        for value in LABELS:
+            labels.append({"name": value})
+
+        page_json['metadata']['labels'] = labels
 
     response = session.put(url, data=json.dumps(page_json))
     response.raise_for_status()
