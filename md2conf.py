@@ -501,6 +501,10 @@ def add_local_refs(page_id, title, html):
                 ref = matches.group(1)
                 alt = matches.group(2)
 
+                if ref not in headers_map:
+                    LOGGER.error("Invalid '%s' local link detected: '%s'. Please update the source file or change the markdown source (-mds) parameter.", MARKDOWN_SOURCE, ref)
+                    sys.exit(1)
+
                 result_ref = headers_map[ref]
 
                 if result_ref:
