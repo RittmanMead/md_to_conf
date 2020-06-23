@@ -361,9 +361,7 @@ def get_page(title):
         link = '%s%s' % (CONFLUENCE_API_URL, data[u'results'][0][u'_links'][u'webui'])
 
         try:
-            LOGGER.info(str(data))
             properties = data[u'results'][0][u'metadata'][u'properties']
-
         except KeyError:
             # In case when page has no content properties we can simply ignore them
             properties = {}
