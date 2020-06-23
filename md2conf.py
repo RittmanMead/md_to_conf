@@ -67,6 +67,10 @@ PARSER.add_argument('--label', action='append', dest='labels', default=[],
 PARSER.add_argument('--property', action='append', dest='properties', default=[],
                     type=lambda kv: kv.split("="),
                     help='A list of content properties to set on the page.')
+PARSER.add_argument('--pages-map', action='append', dest='pages_map', default=[],
+                    type=lambda kv: kv.split("="),
+                    help='Use this option to specify a mapping between a base URL (for links) '
+                         'and base local directory (for .md files) to resolve page to page links')
 
 ARGS = PARSER.parse_args()
 
@@ -88,6 +92,7 @@ try:
     MARKDOWN_SOURCE = ARGS.markdownsrc
     LABELS = ARGS.labels
     PROPERTIES = dict(ARGS.properties)
+    PAGES_MAP = dict(ARGS.pages_map)
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
@@ -458,8 +463,8 @@ def add_local_refs(page_id, title, html):
     # We ignore local references in case of unknown or unspecified markdown source
     if not MARKDOWN_SOURCE in ref_prefixes or \
        not MARKDOWN_SOURCE in ref_postfixes:
-        LOGGER.warning('Local references weren''t processed because '
-                       '--markdownsrc wasn''t set or specified source isn''t supported')
+        LOGGER.warning('Local references weren\'t processed because '
+                       '--markdownsrc wasn\'t set or specified source isn\'t supported')
         return html
 
     ref_prefix = ref_prefixes[MARKDOWN_SOURCE]
@@ -499,11 +504,15 @@ def add_local_refs(page_id, title, html):
                 ref = matches.group(1)
                 alt = matches.group(2)
 
+                LOGGER.debug('--- Found local link: %s', ref)
+
                 if ref not in headers_map:
                     LOGGER.error("Invalid '%s' local link detected: '%s'. Please update the source file or change the markdown source (-mds) parameter.", MARKDOWN_SOURCE, ref)
                     sys.exit(1)
 
                 result_ref = headers_map[ref]
+
+                LOGGER.debug('--- Found local header: %s', result_ref)
 
                 if result_ref:
                     base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
@@ -514,6 +523,61 @@ def add_local_refs(page_id, title, html):
 
                     replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
                     html = html.replace(link, replacement)
+
+                    LOGGER.info('\tTransformed "%s" to "%s"', ref, replacement_uri)
+
+    return html
+
+
+def add_pages_refs(html):
+    """
+    Convert markdown page to page links to correct confluence page to page links
+
+    :param html: string
+    :return: modified html string
+    """
+
+    # We ignore page to page references if no maps are specified
+    if not PAGES_MAP:
+        LOGGER.warning('Page to page references weren\'t processed because '
+                       '--pages_map weren\'t specified')
+        return html
+
+    LOGGER.info('Converting confluence page to page links...')
+
+    links = re.findall(r'<a href=".+?\.md">.+?</a>', html)
+    if links:
+        for link in links:
+            matches = re.search(r'<a href="(.+?\.md)">(.+?)</a>', link)
+            ref = matches.group(1)
+            alt = matches.group(2)
+
+            LOGGER.debug('--- Found page to page link: %s', ref)
+            for key in PAGES_MAP:
+                if ref.startswith(key):
+                    path = os.path.join(PAGES_MAP[key], ref[len(key):])
+            
+                    LOGGER.debug('--- Possible page local path: %s', path)
+                    try:
+                        with open(path, 'r') as mdfile:
+                            title = mdfile.readline().lstrip('#').strip()
+
+                            LOGGER.debug('--- Found local page: %s', title)
+
+                            page = get_page(title)
+                            if not page:
+                                LOGGER.error('Cannot find confluence page "%s"', title)
+                                sys.exit(1)
+
+                            LOGGER.debug('--- Found confluence page: %s', page.link)
+                                
+                            replacement = '<a href="%s" title="%s">%s</a>' % (page.link, alt, alt)
+                            html = html.replace(link, replacement)
+
+                            LOGGER.info('\tTransformed "%s" to "%s"', ref, page.link)
+
+                    except IOError:
+                        LOGGER.error('Cannot find local file "%s" when resolving page to page link "%s"', path, ref)
 
     return html
 
@@ -635,6 +699,9 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
 
     # Add local references
     body = add_local_refs(page_id, title, body)
+
+    # Add page to page references
+    body = add_pages_refs(body)
 
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
