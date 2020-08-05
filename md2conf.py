@@ -67,6 +67,11 @@ PARSER.add_argument('--label', action='append', dest='labels', default=[],
 PARSER.add_argument('--property', action='append', dest='properties', default=[],
                     type=lambda kv: kv.split("="),
                     help='A list of content properties to set on the page.')
+PARSER.add_argument('--detail', action='append', dest='details', default=[],
+                    type=lambda kv: kv.split("="),
+                    help='A list of page details to set on the page')
+PARSER.add_argument('--hide-details', action='store_true', dest='details_visibility', default=False,
+                    help='Use this option to make page details table hidden.')
 PARSER.add_argument('--pages-map', action='append', dest='pages_map', default=[],
                     type=lambda kv: kv.split("="),
                     help='Use this option to specify a mapping between a base URL (for links) '
@@ -92,6 +97,8 @@ try:
     MARKDOWN_SOURCE = ARGS.markdownsrc
     LABELS = ARGS.labels
     PROPERTIES = dict(ARGS.properties)
+    DETAILS = dict(ARGS.details)
+    DETAILS_VISIBILITY = ARGS.details_visibility
     PAGES_MAP = dict(ARGS.pages_map)
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
@@ -858,6 +865,28 @@ def main():
                                                        'markdown.extensions.fenced_code'])
 
     html = '\n'.join(html.split('\n')[1:])
+
+    if DETAILS:
+        LOGGER.info('Generating page properties macro...')
+
+        # Print 'page properties' macro on a page
+        details = '''
+          <ac:structured-macro ac:name="details">
+            <ac:parameter ac:name="hidden">''' + str(DETAILS_VISIBILITY) + '''</ac:parameter>
+            <ac:rich-text-body>
+              <table>
+                <tbody>'''
+
+        for key in DETAILS:
+            details += '<tr><th>' + key + '</th><td>' + DETAILS[key] + '</td></tr>'
+
+        details += '''
+                </tbody>
+              </table>
+            </ac:rich-text-body>
+          </ac:structured-macro>'''
+
+        html = details + html
 
     html = convert_info_macros(html)
     html = convert_comment_block(html)
