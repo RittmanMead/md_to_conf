@@ -59,7 +59,8 @@ PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
 PARSER.add_argument('-v', '--version', type=int, action='store', default=1,
                     help='Version of confluence page (default is 1).')
-PARSER.add_argument('-mds', '--markdownsrc', action='store', default='',
+PARSER.add_argument('-mds', '--markdownsrc', action='store', default='default',
+                    choices=['default', 'bitbucket'],
                     help='Use this option to specify a markdown source (i.e. what processor this markdown was targeting). '
                          'Possible values: bitbucket.')
 PARSER.add_argument('--label', action='append', dest='labels', default=[],
@@ -321,7 +322,18 @@ def slug(string, lowercase):
     if lowercase:
         slug_string = string.lower()
 
-    slug_string = "-".join(slug_string.split())
+
+    # Remove all html code tags
+    slug_string = re.sub(r'<[^>]+>', '', slug_string)
+
+    # Remove html code like '&amp;'
+    slug_string = re.sub(r'&[a-z]+;', '', slug_string)
+
+    # Replace all spaces ( ) with dash (-)
+    slug_string = re.sub(r'[ ]', '-', slug_string)
+
+    # Remove all special chars, except for dash (-)
+    slug_string = re.sub(r'[^a-zA-Z0-9-]', '', slug_string)
     return slug_string
 
 
@@ -488,9 +500,11 @@ def add_local_refs(page_id, title, html):
     """
 
     ref_prefixes = {
+      "default": "#",
       "bitbucket": "#markdown-header-"
     }
     ref_postfixes = {
+      "default": "_%d",
       "bitbucket": "_%d"
     }
 
@@ -515,7 +529,7 @@ def add_local_refs(page_id, title, html):
             key = ref_prefix + slug(header, True)
 
             if VERSION == 1:
-                value = ''.join(header.split())
+                value = re.sub(r'(<.+?>|[ ])', '', header)
             if VERSION == 2:
                 value = slug(header, False)
 
@@ -538,16 +552,17 @@ def add_local_refs(page_id, title, html):
                 ref = matches.group(1)
                 alt = matches.group(2)
 
-                result_ref = headers_map[ref]
+                result_ref = headers_map.get(ref)
 
                 if result_ref:
                     base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
                     if VERSION == 1:
                         replacement_uri = '%s#%s-%s' % (base_uri, ''.join(title.split()), result_ref)
+                        replacement = '<ac:link ac:anchor="%s"><ac:plain-text-link-body><![CDATA[%s]]></ac:plain-text-link-body></ac:link>' % (result_ref, re.sub(r'( *<.+?> *)', ' ', alt))
                     if VERSION == 2:
                         replacement_uri = '%s#%s' % (base_uri, result_ref)
+                        replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
 
-                    replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
                     html = html.replace(link, replacement)
 
     return html
