@@ -67,6 +67,10 @@ PARSER.add_argument('--label', action='append', dest='labels', default=[],
 PARSER.add_argument('--property', action='append', dest='properties', default=[],
                     type=lambda kv: kv.split("="),
                     help='A list of content properties to set on the page.')
+PARSER.add_argument('--title', action='store', dest='title', default=None,
+                    help='Set the title for the page, otherwise the title is going to be the first line in the file')
+PARSER.add_argument('--remove-emojies', action='store_true', dest='remove_emojies', default=False,
+                    help='Remove emojies if there are any. This may be need if the database doesn\'t support emojies')
 
 ARGS = PARSER.parse_args()
 
@@ -91,6 +95,8 @@ try:
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
+    TITLE = ARGS.title
+    REMOVE_EMOJIES = ARGS.remove_emojies
 
     if USERNAME is None:
         LOGGER.error('Error: Username not specified by environment variable or option.')
@@ -138,6 +144,21 @@ def convert_comment_block(html):
 
     return html
 
+def create_table_of_content(html):
+    """
+    Check for the string '[TOC]' and replaces it the Confluence "Table of Content" macro
+
+    :param html: string
+    :return: modified html string
+    """
+    html = re.sub(
+        r'<p>\[TOC\]</p>',
+        '<p><ac:structured-macro ac:name="toc" ac:schema-version="1"/></p>',
+        html,
+        1)
+
+    return html
+
 
 def convert_code_block(html):
     """
@@ -170,6 +191,22 @@ def convert_code_block(html):
             html = html.replace(tag, conf_ml)
 
     return html
+
+
+def remove_emojies(html):
+    """
+    Remove emojies if there are any
+
+    :param html: string
+    :return: modified html string
+    """
+    regrex_pattern = re.compile(pattern = "["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           "]+", flags = re.UNICODE)
+    return regrex_pattern.sub(r'',html)
 
 
 def convert_info_macros(html):
@@ -778,21 +815,29 @@ def main():
     LOGGER.info('Markdown file:\t%s', MARKDOWN_FILE)
     LOGGER.info('Space Key:\t%s', SPACE_KEY)
 
-    with open(MARKDOWN_FILE, 'r') as mdfile:
-        title = mdfile.readline().lstrip('#').strip()
-        mdfile.seek(0)
+    if TITLE:
+        title = TITLE
+    else:
+        with open(MARKDOWN_FILE, 'r') as mdfile:
+            title = mdfile.readline().lstrip('#').strip()
+            mdfile.seek(0)
 
     LOGGER.info('Title:\t\t%s', title)
 
     with codecs.open(MARKDOWN_FILE, 'r', 'utf-8') as mdfile:
-        html = markdown.markdown(mdfile.read(), extensions=['markdown.extensions.tables',
-                                                       'markdown.extensions.fenced_code'])
+        html = mdfile.read()
+        html = markdown.markdown(html, extensions=['tables', 'fenced_code', 'footnotes'])
 
-    html = '\n'.join(html.split('\n')[1:])
+    if not TITLE:
+        html = '\n'.join(html.split('\n')[1:])
 
+    html = create_table_of_content(html)
     html = convert_info_macros(html)
     html = convert_comment_block(html)
     html = convert_code_block(html)
+
+    if REMOVE_EMOJIES:
+        html = remove_emojies(html)
 
     if CONTENTS:
         html = add_contents(html)
