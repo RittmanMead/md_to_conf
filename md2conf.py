@@ -69,7 +69,7 @@ PARSER.add_argument('--property', action='append', dest='properties', default=[]
                     type=lambda kv: kv.split("="),
                     help='A list of content properties to set on the page.')
 PARSER.add_argument('--title', action='store', dest='title', default=None,
-                    help='Set the title for the page, otherwise the title is going to be the first line in the file')
+                    help='Set the title for the page, otherwise the title is going to be the first line in the markdown file')
 PARSER.add_argument('--remove-emojies', action='store_true', dest='remove_emojies', default=False,
                     help='Remove emojies if there are any. This may be need if the database doesn\'t support emojies')
 
