@@ -171,6 +171,26 @@ def convert_code_block(html):
 
     return html
 
+def convert_iframe_macros(html):
+    """[summary]
+    Converts <iframe ...></iframe> to Confluence iframe macro
+    
+    :param html: html string
+    :return: modified html string
+
+    """
+
+    html_tag = '<p><ac:structured-macro ac:name = "html" ><ac:plain-text-body > <![CDATA['
+    close_tag = ']]> </ac:plain-text-body></ac:structured-macro ></p>'
+
+    iframes = re.findall('<iframe(.*?)</iframe>', html, re.DOTALL)
+    if iframes:
+        for iframe in iframes:
+            src = '<iframe' + iframe + '</iframe>'
+            dst = html_tag + src + close_tag
+            html = html.replace(src, dst)
+
+    return html
 
 def convert_info_macros(html):
     """
@@ -793,6 +813,7 @@ def main():
     html = convert_info_macros(html)
     html = convert_comment_block(html)
     html = convert_code_block(html)
+    html = convert_iframe_macros(html)
 
     if CONTENTS:
         html = add_contents(html)
