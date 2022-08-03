@@ -501,7 +501,7 @@ def add_local_refs(page_id, title, html):
                 ref = matches.group(1)
                 alt = matches.group(2)
 
-                result_ref = headers_map[ref]
+                result_ref = headers_map.get(ref)
 
                 if result_ref:
                     base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
