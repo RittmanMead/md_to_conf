@@ -383,6 +383,19 @@ def get_page(title):
         url = '%s,%s' % (url, ','.join("metadata.properties.%s" % v for v in PROPERTIES.keys()))
 
     session = requests.Session()
+    retry_max_requests=5
+    retry_backoff_factor=0.1
+    retry_status_forcelist=(404, 500, 501, 502, 503, 504)
+    retry = requests.adapters.Retry(
+        total=retry_max_requests,
+        connect=retry_max_requests,
+        read=retry_max_requests,
+        backoff_factor=retry_backoff_factor,
+        status_forcelist=retry_status_forcelist,
+    )
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
     session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
@@ -585,24 +598,25 @@ def create_page(title, body, ancestors):
     session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
-    new_page = {'type': 'page', \
-               'title': title, \
-               'space': {'key': SPACE_KEY}, \
-               'body': { \
-                   'storage': { \
-                       'value': body, \
-                       'representation': 'storage' \
-                       } \
-                   }, \
-               'ancestors': ancestors, \
-               'metadata': { \
-                   'properties': { \
-            	  	     'editor': { \
-            	  		       'value': 'v%d' % VERSION \
-            	  	         } \
-              	       } \
-                   } \
-               }
+    new_page = {
+        'type': 'page',
+        'title': title,
+        'space': {'key': SPACE_KEY},
+        'body': {
+            'storage': {
+                'value': body,
+                'representation': 'storage'
+            }
+        },
+        'ancestors': ancestors,
+        'metadata': {
+            'properties': {
+                'editor': {
+                    'value': 'v%d' % VERSION
+                }
+            }
+        }
+    }
 
     LOGGER.debug("data: %s", json.dumps(new_page))
 
@@ -692,23 +706,23 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
     session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
-    page_json = { \
-        "id": page_id, \
-        "type": "page", \
-        "title": title, \
-        "space": {"key": SPACE_KEY}, \
-        "body": { \
-            "storage": { \
-                "value": body, \
-                "representation": "storage" \
-                } \
-            }, \
-        "version": { \
-            "number": version + 1, \
-            "minorEdit" : True \
-            }, \
-        'ancestors': ancestors \
-        }
+    page_json = {
+        "id": page_id,
+        "type": "page",
+        "title": title,
+        "space": {"key": SPACE_KEY},
+        "body": {
+            "storage": {
+                "value": body,
+                "representation": "storage"
+                }
+            },
+        "version": {
+            "number": version + 1,
+            "minorEdit" : True
+            },
+        'ancestors': ancestors
+    }
 
     if LABELS:
         if 'metadata' not in page_json:
@@ -721,7 +735,19 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
         page_json['metadata']['labels'] = labels
 
     response = session.put(url, data=json.dumps(page_json))
-    response.raise_for_status()
+
+    # Check for errors
+    try:
+        response.raise_for_status()
+    except requests.RequestException as err:
+        LOGGER.error('err.response: %s', err)
+        if response.status_code == 404:
+            LOGGER.error('Error: Page not found. Check the following are correct:')
+            LOGGER.error('\tSpace Key : %s', SPACE_KEY)
+            LOGGER.error('\tOrganisation Name: %s', ORGNAME)
+        else:
+            LOGGER.error('Error: %d - %s', response.status_code, response.content)
+        sys.exit(1)
 
     if response.status_code == 200:
         data = response.json()
