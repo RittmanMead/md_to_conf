@@ -107,6 +107,10 @@ Use **-l** or **--loglevel** to specify a different logging level, i.e **DEBUG**
 Use **-s** or **--simulate** to stop processing before interacting with confluence API, i.e. only
  converting the markdown document to confluence format.
 
+Use **--title** to set the title for the page, otherwise the title is going to be the first line in the markdown file
+
+Use **--remove-emojies** to emove emojies if there are any. This may be need if the database doesn't support emojies
+
 ## Markdown
 
 The original markdown to HTML conversion is performed by the Python **markdown** library.
