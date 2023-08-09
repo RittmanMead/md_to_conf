@@ -8,7 +8,7 @@ if (Path('version.txt').is_file()):
 else:
     version = "0.0.0"
 
-version_name = version.strip()
+version_name = version.strip().lstrip("v")
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
