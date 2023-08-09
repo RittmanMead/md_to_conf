@@ -57,8 +57,8 @@ PARSER.add_argument('-l', '--loglevel', default='INFO',
                     help='Use this option to set the log verbosity.')
 PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
-PARSER.add_argument('-v', '--version', type=int, action='store', default=1,
-                    help='Version of confluence page (default is 1).')
+PARSER.add_argument('-v', '--version', type=int, action='store', default=2,
+                    help='Version of confluence page (default is 2).')
 PARSER.add_argument('-mds', '--markdownsrc', action='store', default='default',
                     choices=['default', 'bitbucket'],
                     help='Use this option to specify a markdown source (i.e. what processor this markdown was targeting). '
@@ -647,20 +647,21 @@ def create_page(title, body, parent_id):
     session.headers.update({'Content-Type': 'application/json'})
     space_id = get_space_id()
 
+    LOGGER.info('body %s' % body)
+
     new_page = {
         'title': title,
         'spaceId': '%s' % space_id,
         'status': 'current',
         'body': {
-            'storage': {
-                'value': body,
-                'representation': 'wiki'
-            }
+            'value': body,
+            'representation': 'storage'
         },
         'parentId': '%s' % parent_id,
         'metadata': {
             'properties': {
                 'editor': {
+                    'key': 'editor',
                     'value': 'v%d' % VERSION
                 }
             }
@@ -760,17 +761,23 @@ def update_page(page_id, title, body, version, parent_id, properties, attachment
         "title": title,
         'spaceId': '%s' % get_space_id(),
         'status': 'current',
-        "body": {
-            "storage": {
-                "value": body,
-                "representation": "wiki"
-                }
-            },
+        'body': {
+            'value': body,
+            'representation': 'storage'
+        },
         "version": {
             "number": version + 1,
             "minorEdit" : True
             },
-        'parentId': '%s' % parent_id
+        'parentId': '%s' % parent_id,
+        'metadata': {
+            'properties': {
+                'editor': {
+                    'key': 'editor',
+                    'value': 'v%d' % VERSION
+                }
+            }
+        }
     }
 
     if LABELS:
@@ -968,9 +975,9 @@ def main():
                 else:
                     properties[key] = {"key": key, "version": 1, "value": PROPERTIES[key]}
 
-        update_page(page.id, title, markdown_content, page.version, parent_page_id, properties, ATTACHMENTS)
+        update_page(page.id, title, html, page.version, parent_page_id, properties, ATTACHMENTS)
     else:
-        create_page(title, markdown_content, parent_page_id)
+        create_page(title, html, parent_page_id)
 
     LOGGER.info('Markdown Converter completed successfully.')
 
