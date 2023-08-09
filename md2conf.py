@@ -656,7 +656,7 @@ def create_page(title, body, parent_id):
                 'representation': 'storage'
             }
         },
-        'parentId': '%s' % parent_id
+        'parentId': '%s' % parent_id,
         'metadata': {
             'properties': {
                 'editor': {
@@ -749,7 +749,6 @@ def update_page(page_id, title, body, version, parent_id, properties, attachment
     body = add_local_refs(page_id, title, body)
 
     url = '%s/api/v2/pages/%s' % (CONFLUENCE_API_URL, page_id)
-
     session = requests.Session()
     session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
@@ -758,7 +757,7 @@ def update_page(page_id, title, body, version, parent_id, properties, attachment
         "id": page_id,
         "type": "page",
         "title": title,
-        "space": {"key": SPACE_KEY},
+        'spaceId': '%s' % get_space_id(),
         "body": {
             "storage": {
                 "value": body,
