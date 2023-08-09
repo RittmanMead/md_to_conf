@@ -365,6 +365,50 @@ def process_refs(html):
 
     return html
 
+def get_space_id():
+    """
+    Retrieve the integer space ID for the current SPACE_KEY
+
+    """
+
+    url = '%s/api/v2/spaces?keys=%s' % (CONFLUENCE_API_URL, SPACE_KEY)
+
+    session = requests.Session()
+    retry_max_requests=5
+    retry_backoff_factor=0.1
+    retry_status_forcelist=(404, 500, 501, 502, 503, 504)
+    retry = requests.adapters.Retry(
+        total=retry_max_requests,
+        connect=retry_max_requests,
+        read=retry_max_requests,
+        backoff_factor=retry_backoff_factor,
+        status_forcelist=retry_status_forcelist,
+    )
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    session.auth = (USERNAME, API_KEY)
+
+    response = session.get(url)
+
+    # Check for errors
+    try:
+        response.raise_for_status()
+    except requests.RequestException as err:
+        LOGGER.error('err.response: %s', err)
+        if response.status_code == 404:
+            LOGGER.error('Error: Space not found. Check the following are correct:')
+            LOGGER.error('\tSpace Key : %s', SPACE_KEY)
+            LOGGER.error('\tOrganisation Name: %s', ORGNAME)
+        else:
+            LOGGER.error('Error: %d - %s', response.status_code, response.content)
+        sys.exit(1)
+
+    data = response.json()
+
+    if len(data[u'results']) >= 1:
+        return data[u'results'][0][u'id']
+    return -1
 
 def get_page(title):
     """
@@ -373,9 +417,12 @@ def get_page(title):
     :param title: page tile
     :return: Confluence page info
     """
+
+    space_id = get_space_id()
+
     LOGGER.info('\tRetrieving page information: %s', title)
-    url = '%s/rest/api/content?title=%s&spaceKey=%s&expand=version,ancestors' % (
-        CONFLUENCE_API_URL, urllib.parse.quote_plus(title), SPACE_KEY)
+    url = '%s/api/v2/spaces/%s/pages?title=%s' % (
+        CONFLUENCE_API_URL, space_id, urllib.parse.quote_plus(title))
 
     # We retrieve content property values as part of page content
     # to make sure we are able to update them later
@@ -407,7 +454,7 @@ def get_page(title):
         LOGGER.error('err.response: %s', err)
         if response.status_code == 404:
             LOGGER.error('Error: Page not found. Check the following are correct:')
-            LOGGER.error('\tSpace Key : %s', SPACE_KEY)
+            LOGGER.error('\tSpace Id : %s', space_id)
             LOGGER.error('\tOrganisation Name: %s', ORGNAME)
         else:
             LOGGER.error('Error: %d - %s', response.status_code, response.content)
@@ -560,6 +607,7 @@ def add_local_refs(page_id, title, html):
 
         links = re.findall(r'<a href="#.+?">.+?</a>', html)
         if links:
+            space_id = get_space_id()
             for link in links:
                 matches = re.search(r'<a href="(#.+?)">(.+?)</a>', link)
                 ref = matches.group(1)
@@ -568,7 +616,7 @@ def add_local_refs(page_id, title, html):
                 result_ref = headers_map.get(ref)
 
                 if result_ref:
-                    base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
+                    base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, space_id, page_id, '+'.join(title.split()))
                     if VERSION == 1:
                         replacement_uri = '%s#%s-%s' % (base_uri, ''.join(title.split()), result_ref)
                         replacement = '<ac:link ac:anchor="%s"><ac:plain-text-link-body><![CDATA[%s]]></ac:plain-text-link-body></ac:link>' % (result_ref, re.sub(r'( *<.+?> *)', ' ', alt))
@@ -581,34 +629,34 @@ def add_local_refs(page_id, title, html):
     return html
 
 
-def create_page(title, body, ancestors):
+def create_page(title, body, parent_id):
     """
     Create a new page
 
     :param title: confluence page title
     :param body: confluence page content
-    :param ancestors: confluence page ancestor
+    :param parent_id: confluence parentId
     :return:
     """
     LOGGER.info('Creating page...')
 
-    url = '%s/rest/api/content/' % CONFLUENCE_API_URL
+    url = '%s/api/v2/pages' % CONFLUENCE_API_URL
 
     session = requests.Session()
     session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
+    space_id = get_space_id()
 
     new_page = {
-        'type': 'page',
         'title': title,
-        'space': {'key': SPACE_KEY},
+        'spaceId': '%s' % space_id
         'body': {
             'storage': {
                 'value': body,
                 'representation': 'storage'
             }
         },
-        'ancestors': ancestors,
+        'parentId': '%s' % parent_id
         'metadata': {
             'properties': {
                 'editor': {
@@ -647,7 +695,7 @@ def create_page(title, body, ancestors):
         local_ref_check = re.search('<a href="(#.+?)">(.+?)</a>', body)
         if img_check or local_ref_check or properties or ATTACHMENTS or LABELS:
             LOGGER.info('\tAttachments, local references, content properties or labels found, update procedure called.')
-            update_page(page_id, title, body, version, ancestors, properties, ATTACHMENTS)
+            update_page(page_id, title, body, version, parent_id, properties, ATTACHMENTS)
         else:
             if GO_TO_PAGE:
                 webbrowser.open(link)
@@ -664,7 +712,7 @@ def delete_page(page_id):
     :return: None
     """
     LOGGER.info('Deleting page...')
-    url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
+    url = '%s/api/v2/pages/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
     session.auth = (USERNAME, API_KEY)
@@ -679,7 +727,7 @@ def delete_page(page_id):
         LOGGER.error('Page %s could not be deleted.', page_id)
 
 
-def update_page(page_id, title, body, version, ancestors, properties, attachments):
+def update_page(page_id, title, body, version, parent_id, properties, attachments):
     """
     Update a page
 
@@ -687,7 +735,7 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
     :param title: confluence page title
     :param body: confluence page content
     :param version: confluence page version
-    :param ancestors: confluence page ancestor
+    :param parent_id: confluence parentId
     :param attachments: confluence page attachments
     :return: None
     """
@@ -700,7 +748,7 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
     # Add local references
     body = add_local_refs(page_id, title, body)
 
-    url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
+    url = '%s/api/v2/pages/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
     session.auth = (USERNAME, API_KEY)
@@ -721,7 +769,7 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
             "number": version + 1,
             "minorEdit" : True
             },
-        'ancestors': ancestors
+        'parentId': '%s' % parent_id
     }
 
     if LABELS:
@@ -783,7 +831,7 @@ def get_attachment(page_id, filename):
     :param filename: attachment filename
     :return: attachment info in case of success, False otherwise
     """
-    url = '%s/rest/api/content/%s/child/attachment?filename=%s' % (CONFLUENCE_API_URL, page_id, filename)
+    url = '%s/api/v2/pages/%s/attachments?filename=%s' % (CONFLUENCE_API_URL, page_id, filename)
 
     session = requests.Session()
     session.auth = (USERNAME, API_KEY)
@@ -899,14 +947,15 @@ def main():
         sys.exit(1)
 
     if ANCESTOR:
+        
         parent_page = get_page(ANCESTOR)
         if parent_page:
-            ancestors = [{'type': 'page', 'id': parent_page.id}]
+            parent_page_id = parent_page.id
         else:
             LOGGER.error('Error: Parent page does not exist: %s', ANCESTOR)
             sys.exit(1)
     else:
-        ancestors = []
+        parent_page_id = 0
 
     if page:
         # Populate properties dictionary with updated property values
@@ -918,9 +967,9 @@ def main():
                 else:
                     properties[key] = {"key": key, "version": 1, "value": PROPERTIES[key]}
 
-        update_page(page.id, title, html, page.version, ancestors, properties, ATTACHMENTS)
+        update_page(page.id, title, html, page.version, parent_page_id, properties, ATTACHMENTS)
     else:
-        create_page(title, html, ancestors)
+        create_page(title, html, parent_page_id)
 
     LOGGER.info('Markdown Converter completed successfully.')
 
