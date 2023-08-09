@@ -48,7 +48,7 @@ jobs:
     #     pytest
     - name: Build
       run: |
-        echo ${{ env.GitVersion_fullSemVer }} > version.txt
+        echo ${{ env.GitVersion_FullSemVer }} > version.txt
         python -m pip install build
         python -m build ./
         ls ./dist
