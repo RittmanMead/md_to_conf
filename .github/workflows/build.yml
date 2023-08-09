@@ -28,6 +28,8 @@ jobs:
         preferLatestVersion: true
     - name: Determine Version
       uses: gittools/actions/gitversion/execute@v0
+    - name: Set default version
+      run: echo "VERSION=${{ env.GitVersion_FullSemVer }}" >> $GITHUB_ENV
     - name: Set release version
       if: ${{ github.event.action == 'published' && !github.event.release.draft}}
       run:  TAG=$(git describe --tags); if github.event.release.prerelease; then RELEASE="-prerelease"; else  RELEASE="";  fi; echo "VERSION=${TAG}${RELEASE}" >> $GITHUB_ENV
@@ -50,7 +52,7 @@ jobs:
     #     pytest
     - name: Build
       run: |
-        echo ${{ env.GitVersion_FullSemVer }} > version.txt
+        echo ${{ env.VERSION }} > version.txt
         python -m pip install build
         python -m build ./
         ls ./dist
