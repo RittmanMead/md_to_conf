@@ -6,15 +6,9 @@ if (Path('version.txt').is_file()):
     with open('version.txt') as f:
         version = f.read()
 else:
-    version = "0.1.0"
+    version = "0.0.0"
 
-if (Path('branch_name.txt').is_file()):
-    with open('branch_name.txt') as branch_name_file:
-        branch_name = branch_name_file.read()
-else:
-    branch_name = "local"
-
-version_name = version.strip() + '+' + branch_name.strip()    
+version_name = version.strip()
 
 with open("README.md", "r") as fh:
     long_description = fh.read()

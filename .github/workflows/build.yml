@@ -22,6 +22,11 @@ jobs:
         python-version: ["3.9", "3.10", "3.11"]
 
     steps:
+    - name: Set default version
+      run: echo "VERSION=$(git describe --tags --dirty)" >> $GITHUB_ENV
+    - name: Set release version
+      if: ${{ github.event.action == 'published' && !github.event.release.draft}}
+      run:  TAG=$(git describe --tags); if github.event.release.prerelease; then RELEASE="-prerelease"; else  RELEASE="";  fi; echo "VERSION=${TAG}${RELEASE}" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
@@ -43,4 +48,7 @@ jobs:
     #     pytest
     - name: Build
       run: |
+        echo ${{ env.VERSION }} > version.txt
+        python -m pip install build
         python -m build ./
+        ls ./dist
