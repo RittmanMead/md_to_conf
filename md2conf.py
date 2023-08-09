@@ -649,7 +649,7 @@ def create_page(title, body, parent_id):
 
     new_page = {
         'title': title,
-        'spaceId': '%s' % space_id
+        'spaceId': '%s' % space_id,
         'body': {
             'storage': {
                 'value': body,
