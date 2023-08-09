@@ -654,7 +654,7 @@ def create_page(title, body, parent_id):
         'body': {
             'storage': {
                 'value': body,
-                'representation': 'storage'
+                'representation': 'wiki'
             }
         },
         'parentId': '%s' % parent_id,
@@ -763,7 +763,7 @@ def update_page(page_id, title, body, version, parent_id, properties, attachment
         "body": {
             "storage": {
                 "value": body,
-                "representation": "storage"
+                "representation": "wiki"
                 }
             },
         "version": {
@@ -915,8 +915,8 @@ def main():
     LOGGER.info('Title:\t\t%s', title)
 
     with codecs.open(MARKDOWN_FILE, 'r', 'utf-8') as mdfile:
-        html = mdfile.read()
-        html = markdown.markdown(html, extensions=['tables', 'fenced_code', 'footnotes'])
+        markdown_content = mdfile.read()
+        html = markdown.markdown(markdown_content, extensions=['tables', 'fenced_code', 'footnotes'])
 
     if not TITLE:
         html = '\n'.join(html.split('\n')[1:])
@@ -968,9 +968,9 @@ def main():
                 else:
                     properties[key] = {"key": key, "version": 1, "value": PROPERTIES[key]}
 
-        update_page(page.id, title, html, page.version, parent_page_id, properties, ATTACHMENTS)
+        update_page(page.id, title, markdown_content, page.version, parent_page_id, properties, ATTACHMENTS)
     else:
-        create_page(title, html, parent_page_id)
+        create_page(title, markdown_content, parent_page_id)
 
     LOGGER.info('Markdown Converter completed successfully.')
 
