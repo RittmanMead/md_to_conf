@@ -11,6 +11,8 @@ on:
   pull_request:
     branches:
       - master
+  release:
+    types: [ published ]
 
 jobs:
   build:
@@ -52,3 +54,9 @@ jobs:
         python -m pip install build
         python -m build ./
         ls ./dist
+    - name: Publish package
+      if: ${{ github.event.action == 'published' && !github.event.release.draft}}
+      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
