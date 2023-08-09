@@ -2,8 +2,8 @@
 from setuptools import setup
 from pathlib import Path
 
-if (Path('version.txt').is_file()):
-    with open('version.txt') as f:
+if Path("version.txt").is_file():
+    with open("version.txt") as f:
         version = f.read()
 else:
     version = "0.0.0"
@@ -30,13 +30,13 @@ setup(
         "idna",
         "Markdown",
         "requests",
-        "urllib3"
+        "urllib3",
     ],
     entry_points="""
     [console_scripts]
     md-to-conf=md_to_conf:main
     """,
     packages=["md_to_conf"],
-    package_data = {},
+    package_data={},
     include_package_data=False,
 )
