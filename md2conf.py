@@ -650,6 +650,7 @@ def create_page(title, body, parent_id):
     new_page = {
         'title': title,
         'spaceId': '%s' % space_id,
+        'status': 'current',
         'body': {
             'storage': {
                 'value': body,
@@ -758,6 +759,7 @@ def update_page(page_id, title, body, version, parent_id, properties, attachment
         "type": "page",
         "title": title,
         'spaceId': '%s' % get_space_id(),
+        'status': 'current',
         "body": {
             "storage": {
                 "value": body,
