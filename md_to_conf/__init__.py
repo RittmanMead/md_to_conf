@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
+# Spydersoft Markdown to Confluence Tool
 # --------------------------------------------------------------------------------------------------
-# Rittman Mead Markdown to Confluence Tool
+# Based on Rittman Mead Markdown to Confluence Tool
 # --------------------------------------------------------------------------------------------------
 # Create or Update Atlas pages remotely using markdown files.
 #
-# --------------------------------------------------------------------------------------------------
-# Usage: rest_md2conf.py markdown spacekey
 # --------------------------------------------------------------------------------------------------
 """
 
@@ -23,7 +22,7 @@ import urllib
 import webbrowser
 import requests
 import markdown
-from confluence.client import ConfluenceApiClient
+from .client import ConfluenceApiClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - \
 %(levelname)s - %(funcName)s [%(lineno)d] - \
@@ -578,21 +577,20 @@ def main():
     if ATTACHMENTS:
         add_attachments(page_id, ATTACHMENTS, client)
 
-    properties = client.get_page_properties(page_id)
+    properties = client.get_page_properties(page_id)  
     properties_for_update = []
+    for existingProp in properties:
+        ## Change the editor version
+        if (existingProp["key"] == "editor" and existingProp["value"] != ("v%d" % VERSION)):
+            properties_for_update.append({"key": "editor", "version": existingProp[u'version'][u'number'] + 1, "value": ("v%d" % VERSION), "id": existingProp[u'id']})
+
     if PROPERTIES:
-        for key in PROPERTIES:
-            
+        for key in PROPERTIES:            
             found = False
             for existingProp in properties:
                 if (existingProp["key"] == key):
                     properties_for_update.append({"key": key, "version": existingProp[u'version'][u'number'] + 1, "value": PROPERTIES[key], "id": existingProp[u'id']})    
                     found = True
-
-                ## Change the editor version
-                if (existingProp["key"] == "editor" and existingProp["value"] != VERSION):
-                    properties_for_update.append({"key": "editor", "version": existingProp[u'version'][u'number'] + 1, "value": VERSION, "id": existingProp[u'id']})
-
             if not found:
                 properties_for_update.append({"key": key, "version": 1, "value": PROPERTIES[key]})
             
@@ -602,7 +600,7 @@ def main():
     html = add_local_refs(page_id, title, html)
 
     client.update_page(page_id, title, html, page_version, parent_page_id)
-    if properties and len(properties) > 0:
+    if properties_for_update and len(properties_for_update) > 0:
         LOGGER.info("Updating %s page content properties..." % len(properties))
 
         for prop in properties_for_update:

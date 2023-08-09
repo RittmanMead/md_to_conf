@@ -259,17 +259,8 @@ class ConfluenceApiClient():
                 version_num = data[u'results'][0][u'version'][u'number']
                 link = '%s%s' % (self.confluence_api_url, data[u'results'][0][u'_links'][u'webui'])
 
-                try:
-                    LOGGER.info(str(data))
-                    properties = data[u'results'][0][u'metadata'][u'properties']
-
-                except KeyError:
-                    # In case when page has no content properties we can simply ignore them
-                    properties = {}
-                    pass
-
-                page_info = collections.namedtuple('PageInfo', ['id', 'version', 'link', 'properties'])
-                page = page_info(page_id, version_num, link, properties)
+                page_info = collections.namedtuple('PageInfo', ['id', 'version', 'link'])
+                page = page_info(page_id, version_num, link)
                 return page
 
         return False
@@ -292,14 +283,13 @@ class ConfluenceApiClient():
             LOGGER.error('\tURL: %s', self.confluence_api_url)
         else:
             data = response["data"]
-
-            LOGGER.info("property data: %s", str(data[u'results']))
+            LOGGER.debug("property data: %s", str(data[u'results']))
             
             return data[u'results']
            
         return []
 
-    def update_page_property(self, page_id, property):
+    def update_page_property(self, page_id, page_property):
         """
         Update page property by page id
 
@@ -307,25 +297,24 @@ class ConfluenceApiClient():
         :return: True if successful
         """
         
-        LOGGER.info('\tRetrieving page property information: %s', page_id)
-
         property_json = {
             "page-id": page_id,
-            "key": property["key"],
-            "value": property["value"],
+            "key": page_property["key"],
+            "value": page_property["value"],
             "version": {
-                "number": property["version"],
+                "number": page_property["version"],
                 "minorEdit" : True
                 }
         }
 
-        if "id" in property:
-            url = '%s/api/v2/pages/%s/properties/%s' % (self.confluence_api_url, page_id, property["id"])
-            property_json.update({"property-id": property["id"]})
-            LOGGER.info("prop data %s", property_json)
+        if "id" in page_property:
+            url = '%s/api/v2/pages/%s/properties/%s' % (self.confluence_api_url, page_id, page_property["id"])
+            property_json.update({"property-id": page_property["id"]})
+            LOGGER.info("Updating Property ID %s on Page %s: %s=%s", property_json["property-id"], page_id, property_json["key"], property_json["value"])
             response = self.check_errors_and_get_json(self.get_session(retry=True).put(url, data=json.dumps(property_json)))
         else:
             url = '%s/api/v2/pages/%s/properties' % (self.confluence_api_url, page_id)
+            LOGGER.info("Adding Property to Page %s: %s=%s", page_id, property_json["key"], property_json["value"])
             response = self.check_errors_and_get_json(self.get_session(retry=True).post(url, data=json.dumps(property_json)))
 
         if response["status_code"] != 200:
