@@ -26,7 +26,7 @@ jobs:
       with:
         fetch-depth: 0
     - name: Set default version
-      run: echo "VERSION=$(git describe --tags --dirty)" >> $GITHUB_ENV
+      run: echo "VERSION=$(git describe --tags)" >> $GITHUB_ENV
     - name: Set release version
       if: ${{ github.event.action == 'published' && !github.event.release.draft}}
       run:  TAG=$(git describe --tags); if github.event.release.prerelease; then RELEASE="-prerelease"; else  RELEASE="";  fi; echo "VERSION=${TAG}${RELEASE}" >> $GITHUB_ENV
