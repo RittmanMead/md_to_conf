@@ -12,7 +12,7 @@ Then a page will be created in the space or if it already exists, the page will 
 
 ## Configuration
 
-[Download](https://github.com/rittmanmead/md_to_conf)
+[Download](https://github.com/spyder007/md_to_conf)
 
 ## Requirements
 
