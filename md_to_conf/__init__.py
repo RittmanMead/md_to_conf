@@ -241,7 +241,7 @@ def add_images(page_id: int, html, client):
     return html
 
 
-def add_local_refs(page_id: int, space_id, title, html, converter):
+def add_local_refs(page_id: int, space_id: int, title, html, converter):
     """
     Convert local links to correct confluence local links
 
@@ -305,7 +305,7 @@ def add_local_refs(page_id: int, space_id, title, html, converter):
                 result_ref = headers_map.get(ref)
 
                 if result_ref:
-                    base_uri = "%s/spaces/%s/pages/%d/%s" % (
+                    base_uri = "%s/spaces/%d/pages/%d/%s" % (
                         CONFLUENCE_API_URL,
                         space_id,
                         page_id,

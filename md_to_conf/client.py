@@ -19,7 +19,7 @@ class ConfluenceApiClient:
         self.api_key = api_key
         self.confluence_api_url = confluence_api_url
         self.space_key = space_key
-        self.space_id = ""
+        self.space_id = -1
         self.editor_version = editor_version
 
     def get_session(self, retry=False, json=True):
@@ -109,7 +109,7 @@ class ConfluenceApiClient:
         Retrieve the integer space ID for the current self.space_key
 
         """
-        if self.space_id != "":
+        if self.space_id > -1:
             return self.space_id
 
         url = "%s/api/v2/spaces?keys=%s" % (self.confluence_api_url, self.space_key)
@@ -123,7 +123,7 @@ class ConfluenceApiClient:
         else:
             data = response["data"]
             if len(data["results"]) >= 1:
-                self.space_id = data["results"][0]["id"]
+                self.space_id = int(data["results"][0]["id"])
 
         return self.space_id
 
@@ -144,7 +144,7 @@ class ConfluenceApiClient:
 
         new_page = {
             "title": title,
-            "spaceId": "%s" % space_id,
+            "spaceId": "%d" % space_id,
             "status": "current",
             "body": {"value": body, "representation": "storage"},
             "parentId": "%s" % parent_id,
@@ -163,12 +163,12 @@ class ConfluenceApiClient:
 
         if response["status_code"] == 200:
             data = response["data"]
-            space_id = data["spaceId"]
+            space_id = int(data["spaceId"])
             page_id = int(data["id"])
             version = data["version"]["number"]
             link = "%s%s" % (self.confluence_api_url, data["_links"]["webui"])
 
-            LOGGER.info("Page created in SpaceId %s with ID: %d.", space_id, page_id)
+            LOGGER.info("Page created in SpaceId %d with ID: %d.", space_id, page_id)
             LOGGER.info("URL: %s", link)
 
             page_info = collections.namedtuple(
@@ -177,7 +177,7 @@ class ConfluenceApiClient:
             return page_info(page_id, space_id, version, link)
         else:
             LOGGER.error("Could not create page.")
-            return {"id": "", "spaceId": "", "version": ""}
+            return {"id": 0, "spaceId": 0, "version": ""}
 
     def delete_page(self, page_id: int):
         """
@@ -208,7 +208,7 @@ class ConfluenceApiClient:
         space_id = self.get_space_id()
 
         LOGGER.info("\tRetrieving page information: %s", title)
-        url = "%s/api/v2/spaces/%s/pages?title=%s" % (
+        url = "%s/api/v2/spaces/%d/pages?title=%s" % (
             self.confluence_api_url,
             space_id,
             urllib.parse.quote_plus(title),
@@ -217,7 +217,7 @@ class ConfluenceApiClient:
         response = self.check_errors_and_get_json(self.get_session(retry=True).get(url))
         if response["status_code"] == 404:
             LOGGER.error("Error: Page not found. Check the following are correct:")
-            LOGGER.error("\tSpace Id : %s", space_id)
+            LOGGER.error("\tSpace Id : %d", space_id)
             LOGGER.error("\tURL: %s", self.confluence_api_url)
         else:
             data = response["data"]
@@ -226,7 +226,7 @@ class ConfluenceApiClient:
 
             if len(data["results"]) >= 1:
                 page_id = int(data["results"][0]["id"])
-                space_id = data["results"][0]["spaceId"]
+                space_id = int(data["results"][0]["spaceId"])
                 version_num = data["results"][0]["version"]["number"]
                 link = "%s%s" % (
                     self.confluence_api_url,
