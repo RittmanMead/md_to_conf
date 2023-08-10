@@ -196,7 +196,7 @@ except Exception as err:
     sys.exit(1)
 
 
-def add_attachments(page_id, files, client):
+def add_attachments(page_id: int, files, client):
     """
     Add attachments for an array of files
 
@@ -211,7 +211,7 @@ def add_attachments(page_id, files, client):
             client.upload_attachment(page_id, os.path.join(source_folder, file), "")
 
 
-def add_images(page_id, html, client):
+def add_images(page_id: int, html, client):
     """
     Scan for images and upload as attachments if found
 
@@ -231,17 +231,17 @@ def add_images(page_id, html, client):
             if CONFLUENCE_API_URL.endswith("/wiki"):
                 html = html.replace(
                     "%s" % (rel_path),
-                    "/wiki/download/attachments/%s/%s" % (page_id, basename),
+                    "/wiki/download/attachments/%d/%s" % (page_id, basename),
                 )
             else:
                 html = html.replace(
                     "%s" % (rel_path),
-                    "/download/attachments/%s/%s" % (page_id, basename),
+                    "/download/attachments/%d/%s" % (page_id, basename),
                 )
     return html
 
 
-def add_local_refs(page_id, space_id, title, html, converter):
+def add_local_refs(page_id: int, space_id, title, html, converter):
     """
     Convert local links to correct confluence local links
 
@@ -305,7 +305,7 @@ def add_local_refs(page_id, space_id, title, html, converter):
                 result_ref = headers_map.get(ref)
 
                 if result_ref:
-                    base_uri = "%s/spaces/%s/pages/%s/%s" % (
+                    base_uri = "%s/spaces/%s/pages/%d/%s" % (
                         CONFLUENCE_API_URL,
                         space_id,
                         page_id,
@@ -336,7 +336,13 @@ def add_local_refs(page_id, space_id, title, html, converter):
     return html
 
 
-def get_properties_to_update(client, page_id):
+def get_properties_to_update(client, page_id: int):
+    """
+    Get a list of properties which have changed
+
+    :param page_id: integer
+    :return: array of properties to update
+    """
     properties = client.get_page_properties(page_id)
     properties_for_update = []
     for existingProp in properties:
@@ -437,31 +443,27 @@ def main():
 
     if not page:
         page = client.create_page(title, html, parent_page_id)
-        page_id = page["id"]
-        page_version = page["version"]
-        space_id = page["space_id"]
-    else:
-        page_id = page.id
-        page_version = page.version
-        space_id = page.spaceId
 
     if ATTACHMENTS:
-        add_attachments(page_id, ATTACHMENTS, client)
+        add_attachments(page.id, ATTACHMENTS, client)
 
-    html = add_images(page_id, html, client)
+    html = add_images(page.id, html, client)
     # Add local references
-    html = add_local_refs(page_id, space_id, title, html, converter)
+    html = add_local_refs(page.id, page.spaceId, title, html, converter)
 
-    client.update_page(page_id, title, html, page_version, parent_page_id)
+    client.update_page(page.id, title, html, page.version, parent_page_id)
 
-    properties_for_update = get_properties_to_update(client, page_id)
+    properties_for_update = get_properties_to_update(client, page.id)
     if properties_for_update and len(properties_for_update) > 0:
         LOGGER.info(
             "Updating %s page content properties..." % len(properties_for_update)
         )
 
         for prop in properties_for_update:
-            client.update_page_property(page_id, prop)
+            client.update_page_property(page.id, prop)
+
+    if LABELS:
+        client.update_labels(page.id, LABELS)
 
     LOGGER.info("Markdown Converter completed successfully.")
 

@@ -57,7 +57,7 @@ class ConfluenceApiClient:
 
         return {"status_code": response.status_code, "data": response.json()}
 
-    def update_page(self, page_id, title, body, version, parent_id):
+    def update_page(self, page_id: int, title, body, version, parent_id):
         """
         Update a page
 
@@ -71,7 +71,7 @@ class ConfluenceApiClient:
         """
         LOGGER.info("Updating page...")
 
-        url = "%s/api/v2/pages/%s" % (self.confluence_api_url, page_id)
+        url = "%s/api/v2/pages/%d" % (self.confluence_api_url, page_id)
 
         page_json = {
             "id": page_id,
@@ -83,16 +83,6 @@ class ConfluenceApiClient:
             "version": {"number": version + 1, "minorEdit": True},
             "parentId": "%s" % parent_id,
         }
-
-        # if LABELS:
-        #     if 'metadata' not in page_json:
-        #         page_json['metadata'] = {}
-
-        #     labels = []
-        #     for value in LABELS:
-        #         labels.append({"name": value})
-
-        #     page_json['metadata']['labels'] = labels
 
         session = self.get_session()
         response = self.check_errors_and_get_json(
@@ -174,19 +164,22 @@ class ConfluenceApiClient:
         if response["status_code"] == 200:
             data = response["data"]
             space_id = data["spaceId"]
-            page_id = data["id"]
+            page_id = int(data["id"])
             version = data["version"]["number"]
             link = "%s%s" % (self.confluence_api_url, data["_links"]["webui"])
 
-            LOGGER.info("Page created in SpaceId %s with ID: %s.", space_id, page_id)
+            LOGGER.info("Page created in SpaceId %s with ID: %d.", space_id, page_id)
             LOGGER.info("URL: %s", link)
 
-            return {"id": page_id, "spaceId": space_id, "version": version}
+            page_info = collections.namedtuple(
+                "PageInfo", ["id", "spaceId", "version", "link"]
+            )
+            return page_info(page_id, space_id, version, link)
         else:
             LOGGER.error("Could not create page.")
             return {"id": "", "spaceId": "", "version": ""}
 
-    def delete_page(self, page_id):
+    def delete_page(self, page_id: int):
         """
         Delete a page
 
@@ -194,15 +187,15 @@ class ConfluenceApiClient:
         :return: None
         """
         LOGGER.info("Deleting page...")
-        url = "%s/api/v2/pages/%s" % (self.confluence_api_url, page_id)
+        url = "%s/api/v2/pages/%d" % (self.confluence_api_url, page_id)
 
         response = self.get_session().delete(url)
         response.raise_for_status()
 
         if response.status_code == 204:
-            LOGGER.info("Page %s deleted successfully.", page_id)
+            LOGGER.info("Page %d deleted successfully.", page_id)
         else:
-            LOGGER.error("Page %s could not be deleted.", page_id)
+            LOGGER.error("Page %d could not be deleted.", page_id)
 
     def get_page(self, title):
         """
@@ -232,7 +225,7 @@ class ConfluenceApiClient:
             LOGGER.debug("data: %s", str(data))
 
             if len(data["results"]) >= 1:
-                page_id = data["results"][0]["id"]
+                page_id = int(data["results"][0]["id"])
                 space_id = data["results"][0]["spaceId"]
                 version_num = data["results"][0]["version"]["number"]
                 link = "%s%s" % (
@@ -248,7 +241,7 @@ class ConfluenceApiClient:
 
         return False
 
-    def get_page_properties(self, page_id):
+    def get_page_properties(self, page_id: int):
         """
         Retrieve page properties by page id
 
@@ -256,13 +249,13 @@ class ConfluenceApiClient:
         :return: Page Properties Collection
         """
 
-        LOGGER.info("\tRetrieving page property information: %s", page_id)
-        url = "%s/api/v2/pages/%s/properties" % (self.confluence_api_url, page_id)
+        LOGGER.info("\tRetrieving page property information: %d", page_id)
+        url = "%s/api/v2/pages/%d/properties" % (self.confluence_api_url, page_id)
 
         response = self.check_errors_and_get_json(self.get_session(retry=True).get(url))
         if response["status_code"] == 404:
             LOGGER.error("Error: Page not found. Check the following are correct:")
-            LOGGER.error("\tPage Id : %s", page_id)
+            LOGGER.error("\tPage Id : %d", page_id)
             LOGGER.error("\tURL: %s", self.confluence_api_url)
         else:
             data = response["data"]
@@ -272,7 +265,7 @@ class ConfluenceApiClient:
 
         return []
 
-    def update_page_property(self, page_id, page_property):
+    def update_page_property(self, page_id: int, page_property):
         """
         Update page property by page id
 
@@ -288,14 +281,14 @@ class ConfluenceApiClient:
         }
 
         if "id" in page_property:
-            url = "%s/api/v2/pages/%s/properties/%s" % (
+            url = "%s/api/v2/pages/%d/properties/%s" % (
                 self.confluence_api_url,
                 page_id,
                 page_property["id"],
             )
             property_json.update({"property-id": page_property["id"]})
             LOGGER.info(
-                "Updating Property ID %s on Page %s: %s=%s",
+                "Updating Property ID %s on Page %d: %s=%s",
                 property_json["property-id"],
                 page_id,
                 property_json["key"],
@@ -305,7 +298,7 @@ class ConfluenceApiClient:
                 self.get_session(retry=True).put(url, data=json.dumps(property_json))
             )
         else:
-            url = "%s/api/v2/pages/%s/properties" % (self.confluence_api_url, page_id)
+            url = "%s/api/v2/pages/%d/properties" % (self.confluence_api_url, page_id)
             LOGGER.info(
                 "Adding Property to Page %s: %s=%s",
                 page_id,
@@ -318,7 +311,7 @@ class ConfluenceApiClient:
 
         if response["status_code"] != 200:
             LOGGER.error("Error: Page not found. Check the following are correct:")
-            LOGGER.error("\tPage Id : %s", page_id)
+            LOGGER.error("\tPage Id : %d", page_id)
             LOGGER.error("\tURL: %s", self.confluence_api_url)
             return False
         else:
@@ -326,7 +319,7 @@ class ConfluenceApiClient:
 
         return []
 
-    def get_attachment(self, page_id, filename):
+    def get_attachment(self, page_id: int, filename):
         """
         Get page attachment
 
@@ -334,7 +327,7 @@ class ConfluenceApiClient:
         :param filename: attachment filename
         :return: attachment info in case of success, False otherwise
         """
-        url = "%s/api/v2/pages/%s/attachments?filename=%s" % (
+        url = "%s/api/v2/pages/%d/attachments?filename=%s" % (
             self.confluence_api_url,
             page_id,
             filename,
@@ -352,7 +345,7 @@ class ConfluenceApiClient:
 
         return False
 
-    def upload_attachment(self, page_id, file, comment):
+    def upload_attachment(self, page_id: int, file, comment):
         """
         Upload an attachement
 
@@ -378,13 +371,13 @@ class ConfluenceApiClient:
 
         attachment = self.get_attachment(page_id, filename)
         if attachment:
-            url = "%s/rest/api/content/%s/child/attachment/%s/data" % (
+            url = "%s/rest/api/content/%d/child/attachment/%s/data" % (
                 self.confluence_api_url,
                 page_id,
                 attachment.id,
             )
         else:
-            url = "%s/rest/api/content/%s/child/attachment/" % (
+            url = "%s/rest/api/content/%d/child/attachment/" % (
                 self.confluence_api_url,
                 page_id,
             )
@@ -398,3 +391,86 @@ class ConfluenceApiClient:
         response.raise_for_status()
 
         return True
+
+    def get_label_info(self, label_name: str):
+        """
+        Get label information for the given label name
+
+        :param label_name: pageId
+        :return: LabelInfo.  If not found, labelInfo will be 0
+        """
+
+        LOGGER.debug("\tRetrieving label information: %s", label_name)
+        url = "%s/rest/api/label?name=%s" % (
+            self.confluence_api_url,
+            urllib.parse.quote_plus(label_name),
+        )
+
+        response = self.check_errors_and_get_json(self.get_session().get(url))
+
+        label_info = collections.namedtuple(
+            "LabelInfo", ["id", "name", "prefix", "label"]
+        )
+        data = response["data"]["label"]
+        if response["status_code"] == 404:
+            label = label_info(0, "", "", "")
+        else:
+            label = label_info(
+                int(data["id"]),
+                data["name"],
+                data["prefix"],
+                data["label"],
+            )
+
+        return label
+
+    def add_label(self, page_id: int, label_name: str):
+        label_info = self.get_label_info(label_name)
+        if label_info.id > 0:
+            prefix = label_info.prefix
+        else:
+            prefix = "global"
+
+        add_label_json = {"prefix": prefix, "name": label_name}
+
+        url = "%s/rest/api/content/%d/label" % (self.confluence_api_url, page_id)
+
+        response = self.get_session().post(url, data=json.dumps(add_label_json))
+        response.raise_for_status()
+        return True
+
+    def update_labels(self, page_id: int, labels):
+        """
+        Update labels on given page Id
+
+        :param page_id: pageId
+        :param labels: labels to be added
+        :return: True if successful
+        """
+
+        LOGGER.info("\tRetrieving page property information: %d", page_id)
+        url = "%s/api/v2/pages/%d/labels" % (self.confluence_api_url, page_id)
+
+        response = self.check_errors_and_get_json(self.get_session(retry=True).get(url))
+        if response["status_code"] == 404:
+            LOGGER.error(
+                "Error: Error finding existing labels. Check the following are correct:"
+            )
+            LOGGER.error("\tPage Id : %d", page_id)
+            LOGGER.error("\tURL: %s", self.confluence_api_url)
+            return False
+
+        data = response["data"]
+        for label in labels:
+            found = False
+            for existingLabel in data["results"]:
+                if label == existingLabel["name"]:
+                    found = True
+
+            if not found:
+                LOGGER.info("Adding Label '%s' to Page Id %d", label, page_id)
+                self.add_label(page_id, label)
+
+            LOGGER.debug("property data: %s", str(data["results"]))
+
+        return data["results"]
