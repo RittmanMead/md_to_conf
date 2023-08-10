@@ -1,42 +1,56 @@
 # Markdown to Confluence Converter
 
-A script to import a named markdown document into Confluence.
+This tool can be used to import markdown documents into Confluence.  It is a fork of [RittmanMead/md_to_conf](https://github.com/RittmanMead/md_to_conf), upgraded to Python 3.11 and the Confluence v2 APIs.
 
-It handles inline images as well as code blocks.
+The file is converted to HTML and uploaded to Confluence using their `storage` representation.  The following functionality is supported:
 
-Also there is support for some custom markdown tags for use with commonly used Confluence macros.
+1. Inline images
+2. Code blocks
+3. Some custom markdown tags
 
-The file will be converted into HTML or Confluence storage markup when required.
-
-Then a page will be created in the space or if it already exists, the page will be uploaded.
-
-## Configuration
-
-[Download](https://github.com/spyder007/md_to_conf)
 
 ## Requirements
 
-Python 3.6+
+* Python 3.11+
+* PIP
 
-### Python venv
+## Installation
+
+You can install this tool using `pip`:
+
+```bash
+pip install md-to-conf
+```
+
+It is recommended that your run this in a [virtual environment](#python-virtual-environment) to ensure package compatibility.
+
+### Python Virtual Environment
 
 The project code and dependencies can be used based on python virtualenv.
 
-Create a new python virtualenv:
+Create a new python virtualenv and activate it:
 
 ```less
-> python3 -m venv venv
+python3 -m venv venv
+source venv/bin/activate
 ```
 
 Or in **Anaconda**
 
-	conda create --name md_to_conf python=3.7 --yes
-
-Make the virtualenv active:
-
-```less
-> source venv/bin/activate
+```bash
+  conda create --name md_to_conf python=3.11 --yes
+  conda activate md_to_conf
 ```
+
+Install `md-to-conf`
+
+
+```bash
+  pip install md-to-conf
+```
+
+Type `md-to-conf --help` for details, or see the [Usage](#usage) section below.
+
 
 ### Dependencies
 
@@ -46,9 +60,31 @@ Required python dependencies can be installed using:
 pip3 install -r requirements.txt
 ```
 
+## Usage
+
+### Basic
+
+The minimum accepted parameters are the markdown file to upload as well as the Confluence space key you wish to upload to. For the following examples assume 'Test Space' with key: `TST`.
+
+```less
+python3 md2conf.py readme.md TST
+```
+
+Mandatory Confluence parameters can also be set here if not already set as [environment variables](#environment-variables):
+
+* **-u** **--username**: Confluence User
+* **-p** **--apikey**: Confluence API Key
+* **-o** **--orgname**: Confluence Organization
+
+```less
+python3 md2conf.py readme.md TST -u basil -p abc123 -o fawltytowers
+```
+
+Use **-h** to view a list of all available options.
+
 ### Environment Variables
 
-To use it, you will need your Confluence username, API key and organisation name.
+To use it, you will need your Confluence username, API key and organization name.
 To generate an API key go to [https://id.atlassian.com/manage/api-tokens](https://id.atlassian.com/manage/api-tokens).
 
 You will also need the organization name that is used in the subdomain.
@@ -67,28 +103,6 @@ export CONFLUENCE_ORGNAME='fawltytowers'
 ```
 
 On Windows, this can be set via system properties.
-
-## Use
-
-### Basic
-
-The minimum accepted parameters are the markdown file to upload as well as the Confluence space key you wish to upload to. For the following examples assume 'Test Space' with key: `TST`.
-
-```less
-python3 md2conf.py readme.md TST
-```
-
-Mandatory Confluence parameters can also be set here if not already set as environment variables:
-
-* **-u** **--username**: Confluence User
-* **-p** **--apikey**: Confluence API Key
-* **-o** **--orgname**: Confluence Organisation
-
-```less
-python3 md2conf.py readme.md TST -u basil -p abc123 -o fawltytowers
-```
-
-Use **-h** to view a list of all available options.
 
 ### Other Uses
 

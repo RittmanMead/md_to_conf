@@ -233,6 +233,7 @@ class ConfluenceApiClient:
 
             if len(data["results"]) >= 1:
                 page_id = data["results"][0]["id"]
+                space_id = data["results"][0]["spaceId"]
                 version_num = data["results"][0]["version"]["number"]
                 link = "%s%s" % (
                     self.confluence_api_url,
@@ -240,9 +241,9 @@ class ConfluenceApiClient:
                 )
 
                 page_info = collections.namedtuple(
-                    "PageInfo", ["id", "version", "link"]
+                    "PageInfo", ["id", "spaceId", "version", "link"]
                 )
-                page = page_info(page_id, version_num, link)
+                page = page_info(page_id, space_id, version_num, link)
                 return page
 
         return False
