@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """
 # --------------------------------------------------------------------------------------------------
 # Rittman Mead Markdown to Confluence Tool
@@ -36,6 +36,7 @@ PARSER.add_argument('spacekey',
                     help="Confluence Space key for the page. If omitted, will use user space.")
 PARSER.add_argument('-u', '--username', help='Confluence username if $CONFLUENCE_USERNAME not set.')
 PARSER.add_argument('-p', '--apikey', help='Confluence API key if $CONFLUENCE_API_KEY not set.')
+PARSER.add_argument('--pat', help='Confluence Personal Access Token if $CONFLUENCE_PERSONAL_ACCESS_TOKEN not set.')
 PARSER.add_argument('-o', '--orgname',
                     help='Confluence organisation if $CONFLUENCE_ORGNAME not set. '
                          'e.g. https://XXX.atlassian.net/wiki'
@@ -59,7 +60,8 @@ PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
 PARSER.add_argument('-v', '--version', type=int, action='store', default=1,
                     help='Version of confluence page (default is 1).')
-PARSER.add_argument('-mds', '--markdownsrc', action='store', default='',
+PARSER.add_argument('-mds', '--markdownsrc', action='store', default='default',
+                    choices=['default', 'bitbucket'],
                     help='Use this option to specify a markdown source (i.e. what processor this markdown was targeting). '
                          'Possible values: bitbucket.')
 PARSER.add_argument('--label', action='append', dest='labels', default=[],
@@ -67,6 +69,10 @@ PARSER.add_argument('--label', action='append', dest='labels', default=[],
 PARSER.add_argument('--property', action='append', dest='properties', default=[],
                     type=lambda kv: kv.split("="),
                     help='A list of content properties to set on the page.')
+PARSER.add_argument('--title', action='store', dest='title', default=None,
+                    help='Set the title for the page, otherwise the title is going to be the first line in the markdown file')
+PARSER.add_argument('--remove-emojies', action='store_true', dest='remove_emojies', default=False,
+                    help='Remove emojies if there are any. This may be need if the database doesn\'t support emojies')
 
 ARGS = PARSER.parse_args()
 
@@ -79,6 +85,7 @@ try:
     SPACE_KEY = ARGS.spacekey
     USERNAME = os.getenv('CONFLUENCE_USERNAME', ARGS.username)
     API_KEY = os.getenv('CONFLUENCE_API_KEY', ARGS.apikey)
+    PA_TOKEN = os.getenv('CONFLUENCE_PERSONAL_ACCESS_TOKEN', ARGS.pat)
     ORGNAME = os.getenv('CONFLUENCE_ORGNAME', ARGS.orgname)
     ANCESTOR = ARGS.ancestor
     NOSSL = ARGS.nossl
@@ -91,6 +98,8 @@ try:
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
+    TITLE = ARGS.title
+    REMOVE_EMOJIES = ARGS.remove_emojies
 
     if USERNAME is None:
         LOGGER.error('Error: Username not specified by environment variable or option.')
@@ -109,15 +118,15 @@ try:
 
     if ORGNAME is not None:
         if ORGNAME.find('.') != -1:
-            CONFLUENCE_API_URL = 'https://%s' % ORGNAME
+            CONFLUENCE_API_URL_TMP = 'https://%s' % ORGNAME
         else:
-            CONFLUENCE_API_URL = 'https://%s.atlassian.net/wiki' % ORGNAME
+            CONFLUENCE_API_URL_TMP = 'https://%s.atlassian.net/wiki' % ORGNAME
     else:
         LOGGER.error('Error: Org Name not specified by environment variable or option.')
         sys.exit(1)
 
     if NOSSL:
-        CONFLUENCE_API_URL.replace('https://', 'http://')
+        CONFLUENCE_API_URL = CONFLUENCE_API_URL_TMP.replace('https://', 'http://')
 
 except Exception as err:
     LOGGER.error('\n\nException caught:\n%s ', err)
@@ -135,6 +144,21 @@ def convert_comment_block(html):
     close_tag = '</ac:placeholder>'
 
     html = html.replace('<!--', open_tag).replace('-->', close_tag)
+
+    return html
+
+def create_table_of_content(html):
+    """
+    Check for the string '[TOC]' and replaces it the Confluence "Table of Content" macro
+
+    :param html: string
+    :return: modified html string
+    """
+    html = re.sub(
+        r'<p>\[TOC\]</p>',
+        '<p><ac:structured-macro ac:name="toc" ac:schema-version="1"/></p>',
+        html,
+        1)
 
     return html
 
@@ -170,6 +194,22 @@ def convert_code_block(html):
             html = html.replace(tag, conf_ml)
 
     return html
+
+
+def remove_emojies(html):
+    """
+    Remove emojies if there are any
+
+    :param html: string
+    :return: modified html string
+    """
+    regrex_pattern = re.compile(pattern = "["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           "]+", flags = re.UNICODE)
+    return regrex_pattern.sub(r'',html)
 
 
 def convert_info_macros(html):
@@ -284,7 +324,18 @@ def slug(string, lowercase):
     if lowercase:
         slug_string = string.lower()
 
-    slug_string = "-".join(slug_string.split())
+
+    # Remove all html code tags
+    slug_string = re.sub(r'<[^>]+>', '', slug_string)
+
+    # Remove html code like '&amp;'
+    slug_string = re.sub(r'&[a-z]+;', '', slug_string)
+
+    # Replace all spaces ( ) with dash (-)
+    slug_string = re.sub(r'[ ]', '-', slug_string)
+
+    # Remove all special chars, except for dash (-)
+    slug_string = re.sub(r'[^a-zA-Z0-9-]', '', slug_string)
     return slug_string
 
 
@@ -334,6 +385,25 @@ def get_page(title):
         url = '%s,%s' % (url, ','.join("metadata.properties.%s" % v for v in PROPERTIES.keys()))
 
     session = requests.Session()
+
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
+
+    retry_max_requests=5
+    retry_backoff_factor=0.1
+    retry_status_forcelist=(404, 500, 501, 502, 503, 504)
+    retry = requests.adapters.Retry(
+        total=retry_max_requests,
+        connect=retry_max_requests,
+        read=retry_max_requests,
+        backoff_factor=retry_backoff_factor,
+        status_forcelist=retry_status_forcelist,
+    )
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
     session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
@@ -451,9 +521,11 @@ def add_local_refs(page_id, title, html):
     """
 
     ref_prefixes = {
+      "default": "#",
       "bitbucket": "#markdown-header-"
     }
     ref_postfixes = {
+      "default": "_%d",
       "bitbucket": "_%d"
     }
 
@@ -478,7 +550,7 @@ def add_local_refs(page_id, title, html):
             key = ref_prefix + slug(header, True)
 
             if VERSION == 1:
-                value = ''.join(header.split())
+                value = re.sub(r'(<.+?>|[ ])', '', header)
             if VERSION == 2:
                 value = slug(header, False)
 
@@ -505,16 +577,17 @@ def add_local_refs(page_id, title, html):
                     LOGGER.error("Invalid '%s' local link detected: '%s'. Please update the source file or change the markdown source (-mds) parameter.", MARKDOWN_SOURCE, ref)
                     sys.exit(1)
 
-                result_ref = headers_map[ref]
+                result_ref = headers_map.get(ref)
 
                 if result_ref:
                     base_uri = '%s/spaces/%s/pages/%s/%s' % (CONFLUENCE_API_URL, SPACE_KEY, page_id, '+'.join(title.split()))
                     if VERSION == 1:
                         replacement_uri = '%s#%s-%s' % (base_uri, ''.join(title.split()), result_ref)
+                        replacement = '<ac:link ac:anchor="%s"><ac:plain-text-link-body><![CDATA[%s]]></ac:plain-text-link-body></ac:link>' % (result_ref, re.sub(r'( *<.+?> *)', ' ', alt))
                     if VERSION == 2:
                         replacement_uri = '%s#%s' % (base_uri, result_ref)
+                        replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
 
-                    replacement = '<a href="%s" title="%s">%s</a>' % (replacement_uri, alt, alt)
                     html = html.replace(link, replacement)
 
     return html
@@ -534,27 +607,31 @@ def create_page(title, body, ancestors):
     url = '%s/rest/api/content/' % CONFLUENCE_API_URL
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
-    new_page = {'type': 'page', \
-               'title': title, \
-               'space': {'key': SPACE_KEY}, \
-               'body': { \
-                   'storage': { \
-                       'value': body, \
-                       'representation': 'storage' \
-                       } \
-                   }, \
-               'ancestors': ancestors, \
-               'metadata': { \
-                   'properties': { \
-            	  	     'editor': { \
-            	  		       'value': 'v%d' % VERSION \
-            	  	         } \
-              	       } \
-                   } \
-               }
+    new_page = {
+        'type': 'page',
+        'title': title,
+        'space': {'key': SPACE_KEY},
+        'body': {
+            'storage': {
+                'value': body,
+                'representation': 'storage'
+            }
+        },
+        'ancestors': ancestors,
+        'metadata': {
+            'properties': {
+                'editor': {
+                    'value': 'v%d' % VERSION
+                }
+            }
+        }
+    }
 
     LOGGER.debug("data: %s", json.dumps(new_page))
 
@@ -605,7 +682,10 @@ def delete_page(page_id):
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     response = session.delete(url)
@@ -641,26 +721,29 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
-    page_json = { \
-        "id": page_id, \
-        "type": "page", \
-        "title": title, \
-        "space": {"key": SPACE_KEY}, \
-        "body": { \
-            "storage": { \
-                "value": body, \
-                "representation": "storage" \
-                } \
-            }, \
-        "version": { \
-            "number": version + 1, \
-            "minorEdit" : True \
-            }, \
-        'ancestors': ancestors \
-        }
+    page_json = {
+        "id": page_id,
+        "type": "page",
+        "title": title,
+        "space": {"key": SPACE_KEY},
+        "body": {
+            "storage": {
+                "value": body,
+                "representation": "storage"
+                }
+            },
+        "version": {
+            "number": version + 1,
+            "minorEdit" : True
+            },
+        'ancestors': ancestors
+    }
 
     if LABELS:
         if 'metadata' not in page_json:
@@ -673,7 +756,19 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
         page_json['metadata']['labels'] = labels
 
     response = session.put(url, data=json.dumps(page_json))
-    response.raise_for_status()
+
+    # Check for errors
+    try:
+        response.raise_for_status()
+    except requests.RequestException as err:
+        LOGGER.error('err.response: %s', err)
+        if response.status_code == 404:
+            LOGGER.error('Error: Page not found. Check the following are correct:')
+            LOGGER.error('\tSpace Key : %s', SPACE_KEY)
+            LOGGER.error('\tOrganisation Name: %s', ORGNAME)
+        else:
+            LOGGER.error('Error: %d - %s', response.status_code, response.content)
+        sys.exit(1)
 
     if response.status_code == 200:
         data = response.json()
@@ -712,7 +807,10 @@ def get_attachment(page_id, filename):
     url = '%s/rest/api/content/%s/child/attachment?filename=%s' % (CONFLUENCE_API_URL, page_id, filename)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
     response.raise_for_status()
@@ -758,7 +856,10 @@ def upload_attachment(page_id, file, comment):
         url = '%s/rest/api/content/%s/child/attachment/' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'X-Atlassian-Token': 'no-check'})
 
     LOGGER.info('\tUploading attachment %s...', filename)
@@ -782,21 +883,29 @@ def main():
     LOGGER.info('Markdown file:\t%s', MARKDOWN_FILE)
     LOGGER.info('Space Key:\t%s', SPACE_KEY)
 
-    with open(MARKDOWN_FILE, 'r') as mdfile:
-        title = mdfile.readline().lstrip('#').strip()
-        mdfile.seek(0)
+    if TITLE:
+        title = TITLE
+    else:
+        with open(MARKDOWN_FILE, 'r') as mdfile:
+            title = mdfile.readline().lstrip('#').strip()
+            mdfile.seek(0)
 
     LOGGER.info('Title:\t\t%s', title)
 
     with codecs.open(MARKDOWN_FILE, 'r', 'utf-8') as mdfile:
-        html = markdown.markdown(mdfile.read(), extensions=['markdown.extensions.tables',
-                                                       'markdown.extensions.fenced_code'])
+        html = mdfile.read()
+        html = markdown.markdown(html, extensions=['tables', 'fenced_code', 'footnotes'])
 
-    html = '\n'.join(html.split('\n')[1:])
+    if not TITLE:
+        html = '\n'.join(html.split('\n')[1:])
 
+    html = create_table_of_content(html)
     html = convert_info_macros(html)
     html = convert_comment_block(html)
     html = convert_code_block(html)
+
+    if REMOVE_EMOJIES:
+        html = remove_emojies(html)
 
     if CONTENTS:
         html = add_contents(html)
