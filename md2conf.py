@@ -635,8 +635,8 @@ def add_pages_refs(html):
             LOGGER.debug('--- Found page to page link: %s', ref)
             for key in PAGES_MAP:
                 if ref.startswith(key):
-                    path = os.path.join(PAGES_MAP[key], ref[len(key):])
-            
+                    path = os.path.join(PAGES_MAP[key], urllib.parse.unquote(ref[len(key):]))
+
                     LOGGER.debug('--- Possible page local path: %s', path)
                     try:
                         with open(path, 'r') as mdfile:
