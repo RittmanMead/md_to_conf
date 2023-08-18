@@ -36,6 +36,7 @@ PARSER.add_argument('spacekey',
                     help="Confluence Space key for the page. If omitted, will use user space.")
 PARSER.add_argument('-u', '--username', help='Confluence username if $CONFLUENCE_USERNAME not set.')
 PARSER.add_argument('-p', '--apikey', help='Confluence API key if $CONFLUENCE_API_KEY not set.')
+PARSER.add_argument('--pat', help='Confluence Personal Access Token if $CONFLUENCE_PERSONAL_ACCESS_TOKEN not set.')
 PARSER.add_argument('-o', '--orgname',
                     help='Confluence organisation if $CONFLUENCE_ORGNAME not set. '
                          'e.g. https://XXX.atlassian.net/wiki'
@@ -84,6 +85,7 @@ try:
     SPACE_KEY = ARGS.spacekey
     USERNAME = os.getenv('CONFLUENCE_USERNAME', ARGS.username)
     API_KEY = os.getenv('CONFLUENCE_API_KEY', ARGS.apikey)
+    PA_TOKEN = os.getenv('CONFLUENCE_PERSONAL_ACCESS_TOKEN', ARGS.pat)
     ORGNAME = os.getenv('CONFLUENCE_ORGNAME', ARGS.orgname)
     ANCESTOR = ARGS.ancestor
     NOSSL = ARGS.nossl
@@ -383,6 +385,12 @@ def get_page(title):
         url = '%s,%s' % (url, ','.join("metadata.properties.%s" % v for v in PROPERTIES.keys()))
 
     session = requests.Session()
+
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
+
     retry_max_requests=5
     retry_backoff_factor=0.1
     retry_status_forcelist=(404, 500, 501, 502, 503, 504)
@@ -595,7 +603,10 @@ def create_page(title, body, ancestors):
     url = '%s/rest/api/content/' % CONFLUENCE_API_URL
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     new_page = {
@@ -667,7 +678,10 @@ def delete_page(page_id):
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     response = session.delete(url)
@@ -703,7 +717,10 @@ def update_page(page_id, title, body, version, ancestors, properties, attachment
     url = '%s/rest/api/content/%s' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'Content-Type': 'application/json'})
 
     page_json = {
@@ -786,7 +803,10 @@ def get_attachment(page_id, filename):
     url = '%s/rest/api/content/%s/child/attachment?filename=%s' % (CONFLUENCE_API_URL, page_id, filename)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
     response.raise_for_status()
@@ -832,7 +852,10 @@ def upload_attachment(page_id, file, comment):
         url = '%s/rest/api/content/%s/child/attachment/' % (CONFLUENCE_API_URL, page_id)
 
     session = requests.Session()
-    session.auth = (USERNAME, API_KEY)
+    if PA_TOKEN:
+        session.headers.update({'Authorization': 'Bearer ' + PA_TOKEN})
+    else:
+        session.auth = (USERNAME, API_KEY)
     session.headers.update({'X-Atlassian-Token': 'no-check'})
 
     LOGGER.info('\tUploading attachment %s...', filename)
