@@ -198,6 +198,7 @@ def convert_code_block(html):
 
             conf_ml = conf_ml + '<ac:parameter ac:name="language">' + lang + '</ac:parameter>'
             content = re.search(r'<pre><code.*?>(.*?)</code></pre>', tag, re.DOTALL).group(1)
+            content = content.replace("]]", "]]]]><![CDATA[")
             content = '<ac:plain-text-body><![CDATA[' + content + ']]></ac:plain-text-body>'
             conf_ml = conf_ml + content + '</ac:structured-macro>'
             conf_ml = conf_ml.replace('&lt;', '<').replace('&gt;', '>')
