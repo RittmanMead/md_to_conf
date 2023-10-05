@@ -1,2 +1,9 @@
 .idea
 venv
+*.vsidx
+*.lock
+.vs/md_to_conf/v17/.wsuo
+.vs/
+.vs/launch
+env/
+.vscode/
