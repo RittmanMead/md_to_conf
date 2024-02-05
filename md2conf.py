@@ -182,7 +182,8 @@ def convert_code_block(html):
     :param html: string
     :return: modified html string
     """
-    code_blocks = re.findall(r'<pre><code.*?>.*?</code></pre>', html, re.DOTALL)
+
+    code_blocks = re.findall(r'<pre.*?><code.*?>.*?</code></pre>', html, re.DOTALL)
     if code_blocks:
         for tag in code_blocks:
 
@@ -190,14 +191,15 @@ def convert_code_block(html):
             conf_ml = conf_ml + '<ac:parameter ac:name="theme">Midnight</ac:parameter>'
             conf_ml = conf_ml + '<ac:parameter ac:name="linenumbers">true</ac:parameter>'
 
-            lang = re.search('code class="(.*)"', tag)
+            lang = re.search('code class="language-(.*)"', tag)
             if lang:
                 lang = lang.group(1)
+                logging.debug('lang: %s', lang)
             else:
                 lang = 'none'
 
             conf_ml = conf_ml + '<ac:parameter ac:name="language">' + lang + '</ac:parameter>'
-            content = re.search(r'<pre><code.*?>(.*?)</code></pre>', tag, re.DOTALL).group(1)
+            content = re.search(r'<pre.*?><code.*?>(.*?)</code></pre>', tag, re.DOTALL).group(1)
             content = content.replace("]]", "]]]]><![CDATA[")
             content = '<ac:plain-text-body><![CDATA[' + content + ']]></ac:plain-text-body>'
             conf_ml = conf_ml + content + '</ac:structured-macro>'
@@ -987,7 +989,7 @@ def main():
 
     with codecs.open(MARKDOWN_FILE, 'r', 'utf-8') as mdfile:
         html = mdfile.read()
-        html = markdown.markdown(html, extensions=['tables', 'fenced_code', 'footnotes'])
+        html = markdown.markdown(html, extensions=['tables', 'fenced_code', 'footnotes', 'pymdownx.superfences'])
 
     if not TITLE:
         html = '\n'.join(html.split('\n')[1:])
