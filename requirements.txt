@@ -1,6 +1,7 @@
 certifi==2023.7.22
 chardet==5.0.0
 idna==3.3
-Markdown==3.4.1
+Markdown==3.5.2
 requests==2.31.0
 urllib3==1.26.12
+pymdown-extensions
