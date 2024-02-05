@@ -190,9 +190,10 @@ def convert_code_block(html):
             conf_ml = conf_ml + '<ac:parameter ac:name="theme">Midnight</ac:parameter>'
             conf_ml = conf_ml + '<ac:parameter ac:name="linenumbers">true</ac:parameter>'
 
-            lang = re.search('code class="(.*)"', tag)
+            lang = re.search('code class="language-(.*)"', tag)
             if lang:
                 lang = lang.group(1)
+                logging.debug('lang: %s', lang)
             else:
                 lang = 'none'
 
