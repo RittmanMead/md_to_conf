@@ -139,6 +139,8 @@ try:
 
     if NOSSL:
         CONFLUENCE_API_URL = CONFLUENCE_API_URL_TMP.replace('https://', 'http://')
+    else:
+        CONFLUENCE_API_URL = CONFLUENCE_API_URL_TMP
 
 except Exception as err:
     LOGGER.error('\n\nException caught:\n%s ', err)
@@ -211,7 +213,7 @@ def convert_code_block(html):
 def convert_iframe_macros(html):
     """[summary]
     Converts <iframe ...></iframe> to Confluence iframe macro
-    
+
     :param html: html string
     :return: modified html string
 
@@ -671,7 +673,7 @@ def add_pages_refs(html):
                                 sys.exit(1)
 
                             LOGGER.debug('--- Found confluence page: %s', page.link)
-                                
+
                             replacement = '<a href="%s" title="%s">%s</a>' % (page.link, alt, alt)
                             html = html.replace(link, replacement)
 
