@@ -136,7 +136,7 @@ try:
     else:
         LOGGER.error('Error: Org Name not specified by environment variable or option.')
         sys.exit(1)
-
+    CONFLUENCE_API_URL = CONFLUENCE_API_URL_TMP
     if NOSSL:
         CONFLUENCE_API_URL = CONFLUENCE_API_URL_TMP.replace('https://', 'http://')
     else:
