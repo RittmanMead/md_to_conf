@@ -113,12 +113,12 @@ try:
     TITLE = ARGS.title
     REMOVE_EMOJIES = ARGS.remove_emojies
 
-    if USERNAME is None:
-        LOGGER.error('Error: Username not specified by environment variable or option.')
+    if USERNAME is None and PA_TOKEN is None:
+        LOGGER.error('Error: Username/PAT Token not specified by environment variable or option.')
         sys.exit(1)
 
-    if API_KEY is None:
-        LOGGER.error('Error: API key not specified by environment variable or option.')
+    if API_KEY is None and PA_TOKEN is None:
+        LOGGER.error('Error: API key or Personal Access Token not specified by environment variable or option.')
         sys.exit(1)
 
     if not os.path.exists(MARKDOWN_FILE):
@@ -439,7 +439,6 @@ def get_page(title):
     adapter = requests.adapters.HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
-    session.auth = (USERNAME, API_KEY)
 
     response = session.get(url)
 
