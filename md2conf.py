@@ -1042,7 +1042,7 @@ def main():
 
     if DELETE and page:
         delete_page(page.id)
-        sys.exit(1)
+        sys.exit(0)
 
     if ANCESTOR:
         parent_page = get_page(ANCESTOR)
